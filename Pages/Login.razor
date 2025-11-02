@@ -1,0 +1,95 @@
+@page "/login"
+@layout Components.Layout.FullScreenLayout
+@using System.ComponentModel.DataAnnotations
+@inject IPatientService PatientService
+@inject NavigationManager Nav
+@inject IAuthHelper Auth
+@inject IHttpContextAccessor Http
+
+<div class="auth-container">
+    <div class="container">
+        <div class="row justify-content-center align-items-center min-vh-100">
+            <div class="col-md-5 col-lg-4">
+                <div class="auth-card">
+                    <div class="auth-header text-center mb-4">
+                        <div class="auth-icon mb-3">
+                            <i class="bi bi-shield-lock"></i>
+                        </div>
+                        <h2 class="fw-bold mb-2">Welcome Back</h2>
+                        <p class="text-muted">Sign in to your account</p>
+                    </div>
+
+                    <EditForm Model="model" OnValidSubmit="HandleLogin" FormName="loginForm">
+                        <DataAnnotationsValidator />
+                        <ValidationSummary class="alert alert-danger" />
+                        
+                        <div class="mb-3">
+                            <label class="form-label fw-semibold">
+                                <i class="bi bi-envelope me-2"></i>Email Address
+                            </label>
+                            <InputText class="form-control form-control-lg" placeholder="Enter your email" @bind-Value="model.Email" />
+                        </div>
+                        
+                        <div class="mb-4">
+                            <label class="form-label fw-semibold">
+                                <i class="bi bi-lock me-2"></i>Password
+                            </label>
+                            <InputText type="password" class="form-control form-control-lg" placeholder="Enter your password" @bind-Value="model.Password" />
+                        </div>
+                        
+                        <button class="btn btn-primary btn-lg w-100 mb-3 fw-semibold" type="submit">
+                            <i class="bi bi-box-arrow-in-right me-2"></i>Sign In
+                        </button>
+                    </EditForm>
+
+                    @if(!string.IsNullOrEmpty(error))
+                    {
+                        <div class="alert alert-danger alert-dismissible fade show" role="alert">
+                            <i class="bi bi-exclamation-triangle me-2"></i>@error
+                            <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+                        </div>
+                    }
+
+                    <div class="text-center mt-4">
+                        <p class="mb-0 text-muted">
+                            Don't have an account? 
+                            <a href="/register" class="text-primary fw-semibold text-decoration-none">Sign up here</a>
+                        </p>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+@code {
+ private LoginModel model = new();
+ private string? error;
+
+ private async Task HandleLogin()
+ {
+ var user = await PatientService.AuthenticateAsync(model.Email, model.Password);
+ if (user == null)
+ {
+ error = "Invalid credentials";
+ return;
+ }
+ await Auth.SignInAsync(Http.HttpContext!, user);
+ if (string.Equals(user.Role, "Doctor", StringComparison.OrdinalIgnoreCase))
+ {
+ Nav.NavigateTo("/admin", true);
+ }
+ else
+ {
+ Nav.NavigateTo("/personal-info", true);
+ }
+ }
+
+ public class LoginModel
+ {
+ [Required, EmailAddress]
+ public string Email { get; set; } = string.Empty;
+ [Required]
+ public string Password { get; set; } = string.Empty;
+ }
+}

@@ -1,0 +1,79 @@
+@using Microsoft.AspNetCore.Components.Routing
+@using Microsoft.AspNetCore.Components.Authorization
+@using DigitalTriageApp.Helpers
+@inject NavigationManager Nav
+@inject IHttpContextAccessor Http
+@inject IAuthHelper Auth
+
+<div class="nav-shell">
+    <div class="brand">
+        <span class="brand-mark">DT</span>
+        <span class="brand-name">DigitalTriage</span>
+    </div>
+
+    <ul class="menu">
+        <li>
+            <NavLink href="/" Match="NavLinkMatch.All" class="menu-link">
+                <span class="icon"><i class="bi bi-house"></i></span>
+                <span class="label">Acasă</span>
+            </NavLink>
+        </li>
+        <li class="section">Cont</li>
+        <li>
+            <NavLink href="/register" class="menu-link">
+                <span class="icon"><i class="bi bi-person-plus"></i></span>
+                <span class="label">Creați cont</span>
+            </NavLink>
+        </li>
+        <li>
+            <NavLink href="/login" class="menu-link">
+                <span class="icon"><i class="bi bi-box-arrow-in-right"></i></span>
+                <span class="label">Autentificare</span>
+            </NavLink>
+        </li>
+        <li class="section">Profil</li>
+        <li>
+            <NavLink href="/personal-info" class="menu-link">
+                <span class="icon"><i class="bi bi-person-vcard"></i></span>
+                <span class="label">Date personale</span>
+            </NavLink>
+        </li>
+        <li>
+            <NavLink href="/medical-info" class="menu-link">
+                <span class="icon"><i class="bi bi-heart-pulse"></i></span>
+                <span class="label">Date medicale</span>
+            </NavLink>
+        </li>
+        <li>
+            <NavLink href="/ai-triage" class="menu-link">
+                <span class="icon"><i class="bi bi-robot"></i></span>
+                <span class="label">AI Triage</span>
+            </NavLink>
+        </li>
+        @if(Auth.IsDoctor(Http.HttpContext!.User))
+        {
+        <li class="section">Administrare</li>
+        <li>
+            <NavLink href="/admin" class="menu-link">
+                <span class="icon"><i class="bi bi-speedometer2"></i></span>
+                <span class="label">Panou Admin</span>
+            </NavLink>
+        </li>
+        }
+    </ul>
+
+    <div class="menu-footer">
+        <button class="btn btn-logout" @onclick="Logout">
+            <span class="icon"><i class="bi bi-box-arrow-right"></i></span>
+            <span class="label">Ieșire</span>
+        </button>
+    </div>
+</div>
+
+@code {
+    private async Task Logout()
+    {
+        await Auth.SignOutAsync(Http.HttpContext!);
+        Nav.NavigateTo("/", true);
+    }
+}

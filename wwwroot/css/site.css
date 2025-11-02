@@ -1,0 +1,69 @@
+/* Additional site-specific styles */
+/* Main styles are in app.css */
+
+/* Chat specific improvements */
+.chat-container .avatar {
+    flex-shrink: 0;
+}
+
+/* Card animations */
+@keyframes fadeIn {
+    from {
+        opacity: 0;
+        transform: translateY(10px);
+    }
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
+}
+
+.card {
+    animation: fadeIn 0.3s ease-in;
+}
+
+/* Custom scrollbar for chat */
+.chat-container::-webkit-scrollbar {
+    width: 8px;
+}
+
+.chat-container::-webkit-scrollbar-track {
+    background: transparent;
+}
+
+.chat-container::-webkit-scrollbar-thumb {
+    background: #adb5bd;
+    border-radius: 4px;
+}
+
+.chat-container::-webkit-scrollbar-thumb:hover {
+    background: #6c757d;
+}
+
+/* Selection color */
+::selection {
+    background-color: rgba(13, 110, 253, 0.2);
+    color: var(--dark);
+}
+
+/* Print styles */
+@media print {
+    .btn, .sidebar, .auth-container {
+        display: none !important;
+    }
+}
+
+/* High contrast mode support */
+@media (prefers-contrast: high) {
+    .card {
+        border: 2px solid var(--dark) !important;
+    }
+}
+
+/* Reduced motion support */
+@media (prefers-reduced-motion: reduce) {
+    * {
+        animation: none !important;
+        transition: none !important;
+    }
+}
