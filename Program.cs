@@ -15,6 +15,9 @@ var configuration = builder.Configuration;
 builder.Services.AddRazorComponents()
     .AddInteractiveServerComponents();
 
+// Add Razor Pages support for login
+builder.Services.AddRazorPages();
+
 // Database
 builder.Services.AddDbContext<MedicalTriageDbContext>(options =>
     options.UseSqlServer(configuration.GetConnectionString("MedicalTriageDb")));
@@ -28,7 +31,7 @@ builder.Services.AddScoped<IPatientIssueService, PatientIssueService>();
 builder.Services.AddAuthentication(CookieAuthenticationDefaults.AuthenticationScheme)
     .AddCookie(options =>
     {
-        options.LoginPath = "/login";
+        options.LoginPath = "/Account/Login";
         options.LogoutPath = "/logout";
         options.ExpireTimeSpan = TimeSpan.FromHours(8);
         options.Cookie.HttpOnly = true;
@@ -65,6 +68,9 @@ app.UseAntiforgery();
 
 app.UseAuthentication();
 app.UseAuthorization();
+
+// Map Razor Pages (must be before Blazor components)
+app.MapRazorPages();
 
 app.MapRazorComponents<DigitalTriageApp.Components.App>()
     .AddInteractiveServerRenderMode();

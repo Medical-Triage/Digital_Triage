@@ -35,69 +35,108 @@ namespace DigitalTriageApp.Services
  .FirstOrDefaultAsync(p => p.Id == id);
  }
 
- public Task<bool> IsEmailTakenAsync(string email)
+ public async Task<bool> IsEmailTakenAsync(string email)
  {
- return _db.Patients.AnyAsync(p => p.Email == email);
+  Console.WriteLine($"=== PatientService: IsEmailTakenAsync called with email: '{email}' ===");
+  var result = await _db.Patients.AnyAsync(p => p.Email == email);
+  Console.WriteLine($"Email '{email}' taken: {result}");
+  return result;
  }
 
  public async Task<Patient> RegisterAsync(Patient patient, string password)
  {
- // Hash password
- patient.PasswordHash = BCrypt.Net.BCrypt.HashPassword(password);
+  Console.WriteLine("=== PatientService: RegisterAsync called ===");
+  Console.WriteLine($"Patient data - Email: '{patient.Email}', FirstName: '{patient.FirstName}', LastName: '{patient.LastName}'");
+  Console.WriteLine($"Password length: {password?.Length ?? 0}");
+  Console.WriteLine($"PlaceOfBirth: {(patient.PlaceOfBirth != null ? "provided" : "null")}");
+  Console.WriteLine($"Domicile: {(patient.Domicile != null ? "provided" : "null")}");
+  
+  // Hash password
+  Console.WriteLine("Hashing password...");
+  patient.PasswordHash = BCrypt.Net.BCrypt.HashPassword(password);
+  Console.WriteLine("Password hashed successfully");
 
- // Create related records if provided
- if (patient.PlaceOfBirth != null)
- {
- _db.PlacesOfBirth.Add(patient.PlaceOfBirth);
- await _db.SaveChangesAsync();
- patient.PlaceOfBirthId = patient.PlaceOfBirth.Id;
- }
- if (patient.Domicile != null)
- {
- _db.Domiciles.Add(patient.Domicile);
- await _db.SaveChangesAsync();
- patient.DomicileId = patient.Domicile.Id;
- }
+  // Create related records if provided
+  if (patient.PlaceOfBirth != null)
+  {
+   Console.WriteLine($"Adding PlaceOfBirth - Country: '{patient.PlaceOfBirth.Country}', County: '{patient.PlaceOfBirth.County}', City: '{patient.PlaceOfBirth.City}'");
+   _db.PlacesOfBirth.Add(patient.PlaceOfBirth);
+   await _db.SaveChangesAsync();
+   patient.PlaceOfBirthId = patient.PlaceOfBirth.Id;
+   Console.WriteLine($"PlaceOfBirth saved with ID: {patient.PlaceOfBirthId}");
+  }
+  if (patient.Domicile != null)
+  {
+   Console.WriteLine($"Adding Domicile - Country: '{patient.Domicile.Country}', County: '{patient.Domicile.County}', City: '{patient.Domicile.City}'");
+   _db.Domiciles.Add(patient.Domicile);
+   await _db.SaveChangesAsync();
+   patient.DomicileId = patient.Domicile.Id;
+   Console.WriteLine($"Domicile saved with ID: {patient.DomicileId}");
+  }
 
- _db.Patients.Add(patient);
- await _db.SaveChangesAsync();
+  Console.WriteLine("Adding patient to database...");
+  _db.Patients.Add(patient);
+  await _db.SaveChangesAsync();
+  Console.WriteLine($"Patient saved with ID: {patient.Id}");
 
- // Create empty MedicalData
- var md = new MedicalData
- {
- PatientId = patient.Id,
- LastVisitDate = DateTime.UtcNow
- };
- _db.MedicalDatas.Add(md);
- await _db.SaveChangesAsync();
+  // Create empty MedicalData
+  Console.WriteLine("Creating MedicalData...");
+  var md = new MedicalData
+  {
+   PatientId = patient.Id,
+   LastVisitDate = DateTime.UtcNow
+  };
+  _db.MedicalDatas.Add(md);
+  await _db.SaveChangesAsync();
+  Console.WriteLine("MedicalData created successfully");
 
- return patient;
+  Console.WriteLine("=== PatientService: RegisterAsync completed successfully ===");
+  return patient;
  }
 
  public async Task<Patient?> AuthenticateAsync(string email, string password)
  {
- // Doctor hard-coded check (demo only)
- if (email.EndsWith("@hospital.com", StringComparison.OrdinalIgnoreCase) && password == "hospital")
- {
- return new Patient
- {
- Id = -1, // pseudo id for doctor (no DB row)
- Email = email,
- FirstName = "Doctor",
- LastName = "User",
- Role = "Doctor",
- PasswordHash = string.Empty
- };
- }
+  Console.WriteLine("=== PatientService: AuthenticateAsync called ===");
+  Console.WriteLine($"Email: '{email}', Password length: {password?.Length ?? 0}");
+  
+  // Doctor hard-coded check (demo only)
+  if (email.EndsWith("@hospital.com", StringComparison.OrdinalIgnoreCase) && password == "hospital")
+  {
+   Console.WriteLine("Doctor authentication detected (hard-coded check)");
+   var doctor = new Patient
+   {
+    Id = -1, // pseudo id for doctor (no DB row)
+    Email = email,
+    FirstName = "Doctor",
+    LastName = "User",
+    Role = "Doctor",
+    PasswordHash = string.Empty
+   };
+   Console.WriteLine("Doctor authentication successful");
+   return doctor;
+  }
 
- var patient = await _db.Patients.FirstOrDefaultAsync(p => p.Email == email);
- if (patient == null) return null;
+  Console.WriteLine("Looking up patient in database...");
+  var patient = await _db.Patients.FirstOrDefaultAsync(p => p.Email == email);
+  if (patient == null)
+  {
+   Console.WriteLine($"Patient not found with email: '{email}'");
+   return null;
+  }
+  
+  Console.WriteLine($"Patient found - ID: {patient.Id}, Email: {patient.Email}, Role: {patient.Role}");
+  Console.WriteLine("Verifying password...");
+  var ok = BCrypt.Net.BCrypt.Verify(password, patient.PasswordHash);
+  if (!ok)
+  {
+   Console.WriteLine("Password verification failed");
+   return null;
+  }
 
- var ok = BCrypt.Net.BCrypt.Verify(password, patient.PasswordHash);
- if (!ok) return null;
-
- patient.Role ??= "Patient";
- return patient;
+  Console.WriteLine("Password verification successful");
+  patient.Role ??= "Patient";
+  Console.WriteLine($"=== PatientService: AuthenticateAsync completed - User: {patient.Email}, Role: {patient.Role} ===");
+  return patient;
  }
 
  public async Task UpdateAsync(Patient patient)
