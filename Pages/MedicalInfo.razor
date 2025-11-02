@@ -31,7 +31,8 @@
             <div class="col-lg-10">
                 <div class="card shadow-sm border-0">
                     <div class="card-body p-4">
-                        <EditForm Model="data" OnValidSubmit="HandleUpdate" FormName="medicalInfoForm">
+                        <EditForm Model="data" OnValidSubmit="HandleUpdate" OnInvalidSubmit="HandleInvalidSubmit" FormName="medicalInfoForm">
+                            <AntiforgeryToken />
                             <DataAnnotationsValidator />
                             <ValidationSummary class="alert alert-danger" />
                             
@@ -163,15 +164,51 @@
 
  protected override async Task OnInitializedAsync()
  {
+  Console.WriteLine("=== MedicalInfo.razor: OnInitializedAsync called ===");
   var id = Auth.GetUserId(Http.HttpContext!.User);
-  if (!id.HasValue) return;
+  if (!id.HasValue)
+  {
+   Console.WriteLine("No user ID found");
+   return;
+  }
+  Console.WriteLine($"Loading medical data for patient ID: {id.Value}");
   data = await MedicalDataService.GetByPatientIdAsync(id.Value);
+  if (data != null)
+  {
+   Console.WriteLine($"Medical data loaded - BloodType: '{data.BloodType}', Allergies: '{data.Allergies}'");
+  }
+  else
+  {
+   Console.WriteLine("Medical data not found");
+  }
+ }
+
+ private void HandleInvalidSubmit(EditContext editContext)
+ {
+  Console.WriteLine("=== MedicalInfo.razor: HandleInvalidSubmit CALLED (Validation FAILED) ===");
+  if (data != null)
+  {
+   Console.WriteLine($"Medical data state - BloodType: '{data.BloodType}', Allergies: '{data.Allergies}'");
+  }
+  var validationMessages = editContext.GetValidationMessages();
+  Console.WriteLine($"Validation errors count: {validationMessages.Count()}");
+  foreach (var msg in validationMessages)
+  {
+   Console.WriteLine($"  Validation error: {msg}");
+  }
  }
 
  private async Task HandleUpdate()
  {
-  if (data == null) return;
+  Console.WriteLine("=== MedicalInfo.razor: HandleUpdate CALLED ===");
+  if (data == null)
+  {
+   Console.WriteLine("ERROR: Medical data is null");
+   return;
+  }
+  Console.WriteLine($"Updating medical data - BloodType: '{data.BloodType}', Allergies: '{data.Allergies}'");
   await MedicalDataService.UpdateAsync(data);
+  Console.WriteLine("Update successful");
   message = "Medical information updated successfully";
  }
 }

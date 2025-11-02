@@ -15,6 +15,9 @@ var configuration = builder.Configuration;
 builder.Services.AddRazorComponents()
     .AddInteractiveServerComponents();
 
+// Add Razor Pages support for login
+builder.Services.AddRazorPages();
+
 // Database
 builder.Services.AddDbContext<MedicalTriageDbContext>(options =>
     options.UseSqlServer(configuration.GetConnectionString("MedicalTriageDb")));
@@ -28,7 +31,7 @@ builder.Services.AddScoped<IPatientIssueService, PatientIssueService>();
 builder.Services.AddAuthentication(CookieAuthenticationDefaults.AuthenticationScheme)
     .AddCookie(options =>
     {
-        options.LoginPath = "/login";
+        options.LoginPath = "/Account/Login";
         options.LogoutPath = "/logout";
         options.ExpireTimeSpan = TimeSpan.FromHours(8);
         options.Cookie.HttpOnly = true;
@@ -46,8 +49,33 @@ builder.Services.AddAuthorization(options =>
 builder.Services.AddCascadingAuthenticationState();
 builder.Services.AddHttpContextAccessor();
 
+// Configure Antiforgery with custom header
+builder.Services.AddAntiforgery(options =>
+{
+    options.HeaderName = "X-CSRF-TOKEN"; // Custom header name
+    options.Cookie.Name = "__RequestVerificationToken";
+    options.Cookie.HttpOnly = true;
+    options.Cookie.SameSite = SameSiteMode.Lax;
+    options.Cookie.SecurePolicy = builder.Environment.IsDevelopment() 
+        ? CookieSecurePolicy.SameAsRequest 
+        : CookieSecurePolicy.Always;
+});
+
+// Add HttpClient for API calls
+builder.Services.AddHttpClient();
+builder.Services.AddScoped<HttpClient>(serviceProvider =>
+{
+    var factory = serviceProvider.GetRequiredService<IHttpClientFactory>();
+    var client = factory.CreateClient();
+    client.BaseAddress = new Uri(builder.Configuration["BaseUrl"] ?? "https://localhost:7266");
+    return client;
+});
+
 // Auth helper
 builder.Services.AddScoped<IAuthHelper, AuthHelper>();
+
+// Antiforgery helper
+builder.Services.AddScoped<AntiforgeryHelper>();
 
 var app = builder.Build();
 
@@ -65,6 +93,12 @@ app.UseAntiforgery();
 
 app.UseAuthentication();
 app.UseAuthorization();
+
+// Map Razor Pages (must be before Blazor components)
+app.MapRazorPages();
+
+// Map API Controllers (for antiforgery token endpoint)
+app.MapControllers();
 
 app.MapRazorComponents<DigitalTriageApp.Components.App>()
     .AddInteractiveServerRenderMode();

@@ -34,7 +34,8 @@
                             <i class="bi bi-person-vcard me-2 text-primary"></i>Identity Information
                         </h5>
                         
-                        <EditForm Model="patient" OnValidSubmit="HandleUpdate" FormName="personalInfoForm">
+                        <EditForm Model="patient" OnValidSubmit="HandleUpdate" OnInvalidSubmit="HandleInvalidSubmit" FormName="personalInfoForm">
+                            <AntiforgeryToken />
                             <DataAnnotationsValidator />
                             <ValidationSummary class="alert alert-danger" />
 
@@ -131,6 +132,7 @@
                         </h5>
                         
                         <EditForm Model="issueModel" OnValidSubmit="AddIssue" FormName="issueForm">
+                            <AntiforgeryToken />
                             <DataAnnotationsValidator />
                             <ValidationSummary class="alert alert-danger" />
                             <div class="row g-2 mb-3">
@@ -227,21 +229,57 @@
 
  protected override async Task OnInitializedAsync()
  {
+  Console.WriteLine("=== PersonalInfo.razor: OnInitializedAsync called ===");
   var id = Auth.GetUserId(Http.HttpContext!.User);
-  if (!id.HasValue) return;
+  if (!id.HasValue)
+  {
+   Console.WriteLine("No user ID found");
+   return;
+  }
+  Console.WriteLine($"Loading patient with ID: {id.Value}");
   patient = await PatientService.GetByIdAsync(id.Value);
   if (patient != null)
   {
+   Console.WriteLine($"Patient loaded - Email: '{patient.Email}', FirstName: '{patient.FirstName}', LastName: '{patient.LastName}'");
    patient.PlaceOfBirth ??= new PlaceOfBirth();
    patient.Domicile ??= new Domicile();
+   Console.WriteLine("PlaceOfBirth and Domicile initialized");
+  }
+  else
+  {
+   Console.WriteLine("Patient not found");
   }
   issues = await IssueService.GetByPatientIdAsync(id.Value);
+  Console.WriteLine($"Loaded {issues?.Count ?? 0} issues");
+ }
+
+ private void HandleInvalidSubmit(EditContext editContext)
+ {
+  Console.WriteLine("=== PersonalInfo.razor: HandleInvalidSubmit CALLED (Validation FAILED) ===");
+  if (patient != null)
+  {
+   Console.WriteLine($"Patient state - FirstName: '{patient.FirstName}', LastName: '{patient.LastName}', CNP: '{patient.Cnp}'");
+  }
+  var validationMessages = editContext.GetValidationMessages();
+  Console.WriteLine($"Validation errors count: {validationMessages.Count()}");
+  foreach (var msg in validationMessages)
+  {
+   Console.WriteLine($"  Validation error: {msg}");
+  }
  }
 
  private async Task HandleUpdate()
  {
-  if (patient == null) return;
+  Console.WriteLine("=== PersonalInfo.razor: HandleUpdate CALLED ===");
+  if (patient == null)
+  {
+   Console.WriteLine("ERROR: Patient is null");
+   return;
+  }
+  Console.WriteLine($"Updating patient - Email: '{patient.Email}', FirstName: '{patient.FirstName}', LastName: '{patient.LastName}'");
+  Console.WriteLine($"CNP: '{patient.Cnp}', Serie: '{patient.Serie}', Nr: '{patient.Nr}'");
   await PatientService.UpdateAsync(patient);
+  Console.WriteLine("Update successful");
   message = "Information updated successfully";
  }
 
