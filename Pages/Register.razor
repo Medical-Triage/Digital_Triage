@@ -23,6 +23,7 @@
  </div>
 
  <EditForm EditContext="_editContext" OnValidSubmit="HandleRegister" OnInvalidSubmit="HandleInvalidSubmit" FormName="registerForm">
+ <AntiforgeryToken />
  <DataAnnotationsValidator />
  <ValidationSummary class="alert alert-danger" />
 

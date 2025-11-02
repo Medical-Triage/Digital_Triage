@@ -32,6 +32,7 @@
                 <div class="card shadow-sm border-0">
                     <div class="card-body p-4">
                         <EditForm Model="data" OnValidSubmit="HandleUpdate" OnInvalidSubmit="HandleInvalidSubmit" FormName="medicalInfoForm">
+                            <AntiforgeryToken />
                             <DataAnnotationsValidator />
                             <ValidationSummary class="alert alert-danger" />
                             

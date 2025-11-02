@@ -141,17 +141,54 @@ namespace DigitalTriageApp.Services
 
  public async Task UpdateAsync(Patient patient)
  {
- // Attach and update related entities
- if (patient.PlaceOfBirthId.HasValue && patient.PlaceOfBirth != null)
- {
- _db.PlacesOfBirth.Update(patient.PlaceOfBirth);
- }
- if (patient.DomicileId.HasValue && patient.Domicile != null)
- {
- _db.Domiciles.Update(patient.Domicile);
- }
- _db.Patients.Update(patient);
- await _db.SaveChangesAsync();
+  Console.WriteLine("=== PatientService: UpdateAsync called ===");
+  Console.WriteLine($"Patient ID: {patient.Id}, Email: '{patient.Email}'");
+  
+  // Handle PlaceOfBirth
+  if (patient.PlaceOfBirth != null)
+  {
+   if (patient.PlaceOfBirth.Id == 0)
+   {
+    // New PlaceOfBirth - create it
+    Console.WriteLine("Creating new PlaceOfBirth");
+    _db.PlacesOfBirth.Add(patient.PlaceOfBirth);
+    await _db.SaveChangesAsync();
+    patient.PlaceOfBirthId = patient.PlaceOfBirth.Id;
+    Console.WriteLine($"PlaceOfBirth created with ID: {patient.PlaceOfBirthId}");
+   }
+   else if (patient.PlaceOfBirthId.HasValue && patient.PlaceOfBirthId.Value == patient.PlaceOfBirth.Id)
+   {
+    // Existing PlaceOfBirth - update it
+    Console.WriteLine($"Updating existing PlaceOfBirth with ID: {patient.PlaceOfBirth.Id}");
+    _db.PlacesOfBirth.Update(patient.PlaceOfBirth);
+   }
+  }
+  
+  // Handle Domicile
+  if (patient.Domicile != null)
+  {
+   if (patient.Domicile.Id == 0)
+   {
+    // New Domicile - create it
+    Console.WriteLine("Creating new Domicile");
+    _db.Domiciles.Add(patient.Domicile);
+    await _db.SaveChangesAsync();
+    patient.DomicileId = patient.Domicile.Id;
+    Console.WriteLine($"Domicile created with ID: {patient.DomicileId}");
+   }
+   else if (patient.DomicileId.HasValue && patient.DomicileId.Value == patient.Domicile.Id)
+   {
+    // Existing Domicile - update it
+    Console.WriteLine($"Updating existing Domicile with ID: {patient.Domicile.Id}");
+    _db.Domiciles.Update(patient.Domicile);
+   }
+  }
+  
+  // Update the patient
+  Console.WriteLine("Updating patient record");
+  _db.Patients.Update(patient);
+  await _db.SaveChangesAsync();
+  Console.WriteLine("=== PatientService: UpdateAsync completed successfully ===");
  }
 
  public Task<List<Patient>> GetAllAsync()

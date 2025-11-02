@@ -35,6 +35,7 @@
                         </h5>
                         
                         <EditForm Model="patient" OnValidSubmit="HandleUpdate" OnInvalidSubmit="HandleInvalidSubmit" FormName="personalInfoForm">
+                            <AntiforgeryToken />
                             <DataAnnotationsValidator />
                             <ValidationSummary class="alert alert-danger" />
 
@@ -131,6 +132,7 @@
                         </h5>
                         
                         <EditForm Model="issueModel" OnValidSubmit="AddIssue" FormName="issueForm">
+                            <AntiforgeryToken />
                             <DataAnnotationsValidator />
                             <ValidationSummary class="alert alert-danger" />
                             <div class="row g-2 mb-3">
