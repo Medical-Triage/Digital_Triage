@@ -200,5 +200,69 @@ namespace DigitalTriageApp.Services
  .Include(p => p.Domicile)
  .ToListAsync();
  }
+
+ public async Task DeleteAsync(int patientId)
+ {
+  Console.WriteLine($"=== PatientService: DeleteAsync called for patient ID: {patientId} ===");
+  
+  // Load patient with all related data
+  var patient = await _db.Patients
+   .Include(p => p.PlaceOfBirth)
+   .Include(p => p.Domicile)
+   .Include(p => p.MedicalDatas)
+   .Include(p => p.Issues)
+   .FirstOrDefaultAsync(p => p.Id == patientId);
+
+  if (patient == null)
+  {
+   Console.WriteLine($"Patient with ID {patientId} not found");
+   return;
+  }
+
+  Console.WriteLine($"Patient found - Email: '{patient.Email}'");
+
+  // Handle PlaceOfBirth - delete if no other patients reference it
+  if (patient.PlaceOfBirthId.HasValue)
+  {
+   var placeOfBirthId = patient.PlaceOfBirthId.Value;
+   var otherPatientsUsingPlaceOfBirth = await _db.Patients
+    .AnyAsync(p => p.Id != patientId && p.PlaceOfBirthId == placeOfBirthId);
+   
+   if (!otherPatientsUsingPlaceOfBirth && patient.PlaceOfBirth != null)
+   {
+    Console.WriteLine($"Deleting PlaceOfBirth with ID: {placeOfBirthId}");
+    _db.PlacesOfBirth.Remove(patient.PlaceOfBirth);
+   }
+   else
+   {
+    Console.WriteLine($"PlaceOfBirth with ID {placeOfBirthId} is used by other patients, keeping it");
+   }
+  }
+
+  // Handle Domicile - delete if no other patients reference it
+  if (patient.DomicileId.HasValue)
+  {
+   var domicileId = patient.DomicileId.Value;
+   var otherPatientsUsingDomicile = await _db.Patients
+    .AnyAsync(p => p.Id != patientId && p.DomicileId == domicileId);
+   
+   if (!otherPatientsUsingDomicile && patient.Domicile != null)
+   {
+    Console.WriteLine($"Deleting Domicile with ID: {domicileId}");
+    _db.Domiciles.Remove(patient.Domicile);
+   }
+   else
+   {
+    Console.WriteLine($"Domicile with ID {domicileId} is used by other patients, keeping it");
+   }
+  }
+
+  // Delete patient (MedicalData and PatientIssue will be cascade deleted)
+  Console.WriteLine("Deleting patient and related data (MedicalData and PatientIssue will be cascade deleted)");
+  _db.Patients.Remove(patient);
+  await _db.SaveChangesAsync();
+  
+  Console.WriteLine($"=== PatientService: DeleteAsync completed successfully for patient ID: {patientId} ===");
+ }
  }
 }

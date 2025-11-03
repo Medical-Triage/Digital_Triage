@@ -21,6 +21,7 @@ A modern medical triage platform built with ASP.NET Core Blazor Server that enab
 ### For Patients
 - **User Registration & Authentication**: Secure account creation with email and password (password hashing using BCrypt)
 - **Personal Information Management**: Store and update personal details including CNP, citizenship, place of birth, and domicile address
+- **Account Deletion**: Permanently delete account and all associated data with confirmation dialog (available in Personal Information page)
 - **Medical Information Management**: Record and manage medical data including:
   - Blood type
   - Allergies
@@ -36,6 +37,7 @@ A modern medical triage platform built with ASP.NET Core Blazor Server that enab
 - **Admin Dashboard**: Access to comprehensive patient data and medical records
 - **Patient Management**: View all registered patients and their information
 - **Medical Records Access**: Full access to patient medical histories
+- **Streamlined Navigation**: Role-based menu visibility - Profile section hidden, only Administration section visible
 
 ## Prerequisites
 
@@ -393,6 +395,8 @@ ORDER BY ParentTable, ForeignKeyName;
 1. **Personal Information Management**:
    - Patients can update personal details including CNP, citizenship, addresses
    - Place of birth and domicile are stored as separate entities
+   - **Account Deletion**: Patients can permanently delete their account with a confirmation dialog
+   - Deletion removes all associated data: personal info, medical data, reported issues, and related addresses (if not shared)
 
 2. **Medical Information**:
    - One-to-many relationship: Patients can have multiple medical data records
@@ -405,6 +409,11 @@ ORDER BY ParentTable, ForeignKeyName;
 4. **Admin Dashboard**:
    - Available only to users with "Doctor" role
    - Provides comprehensive view of all patients and their medical records
+
+5. **User Interface Enhancements**:
+   - **Fixed Sidebar Navigation**: Navigation menu remains visible while scrolling page content
+   - **Role-Based Menu**: Profile section (Personal Information, Medical Information, AI Triage) only visible to patients
+   - Doctors see a streamlined menu with only Home, Admin Dashboard, and Exit options
 
 ## Project Structure
 
@@ -482,13 +491,17 @@ Configured in `Program.cs`:
   - Medical information management
   - AI Triage (preview)
   - Patient issue submission
+  - Account deletion functionality
+- Navigation menu shows: Home, Profile section (Personal Information, Medical Information, AI Triage), and Exit
 
 ### Doctor Role
 - Special role for healthcare professionals
 - **Demo credentials**: Any email ending with `@hospital.com` and password `hospital`
 - Can access:
-  - All patient features
   - Admin Dashboard with full patient data access
+  - All patient data viewing and management
+- Navigation menu shows: Home, Administration section (Admin Dashboard), and Exit
+- Profile section (Personal Information, Medical Information, AI Triage) is hidden for doctors
 
 ## Troubleshooting
 
