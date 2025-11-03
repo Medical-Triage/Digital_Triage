@@ -82,43 +82,46 @@
 
             @if (Http.HttpContext!.User.Identity?.IsAuthenticated == true)
             {
-                <!-- Profile Section (for authenticated users) -->
-                <li class="menu-section">
-                    <span class="section-label">PROFILE</span>
-                </li>
-                <li>
-                    <button type="button"
-                            class="menu-link menu-card @GetActiveClass("/personal-info")"
-                            @onclick="@(() => NavigateTo("/personal-info"))"
-                            aria-label="Personal Information">
-                        <span class="icon-wrapper">
-                            <i class="bi bi-person-vcard-fill"></i>
-                        </span>
-                        <span class="label">Personal Information</span>
-                    </button>
-                </li>
-                <li>
-                    <button type="button"
-                            class="menu-link menu-card @GetActiveClass("/medical-info")"
-                            @onclick="@(() => NavigateTo("/medical-info"))"
-                            aria-label="Medical Information">
-                        <span class="icon-wrapper">
-                            <i class="bi bi-heart-pulse-fill"></i>
-                        </span>
-                        <span class="label">Medical Information</span>
-                    </button>
-                </li>
-                <li>
-                    <button type="button"
-                            class="menu-link menu-card @GetActiveClass("/ai-triage")"
-                            @onclick="@(() => NavigateTo("/ai-triage"))"
-                            aria-label="AI Triage">
-                        <span class="icon-wrapper">
-                            <i class="bi bi-robot"></i>
-                        </span>
-                        <span class="label">AI Triage</span>
-                    </button>
-                </li>
+                <!-- Profile Section (for patients only) -->
+                @if (!Auth.IsDoctor(Http.HttpContext!.User))
+                {
+                    <li class="menu-section">
+                        <span class="section-label">PROFILE</span>
+                    </li>
+                    <li>
+                        <button type="button"
+                                class="menu-link menu-card @GetActiveClass("/personal-info")"
+                                @onclick="@(() => NavigateTo("/personal-info"))"
+                                aria-label="Personal Information">
+                            <span class="icon-wrapper">
+                                <i class="bi bi-person-vcard-fill"></i>
+                            </span>
+                            <span class="label">Personal Information</span>
+                        </button>
+                    </li>
+                    <li>
+                        <button type="button"
+                                class="menu-link menu-card @GetActiveClass("/medical-info")"
+                                @onclick="@(() => NavigateTo("/medical-info"))"
+                                aria-label="Medical Information">
+                            <span class="icon-wrapper">
+                                <i class="bi bi-heart-pulse-fill"></i>
+                            </span>
+                            <span class="label">Medical Information</span>
+                        </button>
+                    </li>
+                    <li>
+                        <button type="button"
+                                class="menu-link menu-card @GetActiveClass("/ai-triage")"
+                                @onclick="@(() => NavigateTo("/ai-triage"))"
+                                aria-label="AI Triage">
+                            <span class="icon-wrapper">
+                                <i class="bi bi-robot"></i>
+                            </span>
+                            <span class="label">AI Triage</span>
+                        </button>
+                    </li>
+                }
 
                 <!-- Admin Section (for doctors only) -->
                 @if (Auth.IsDoctor(Http.HttpContext!.User))
