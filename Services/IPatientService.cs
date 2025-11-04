@@ -14,5 +14,6 @@ namespace DigitalTriageApp.Services
  Task<Patient?> AuthenticateAsync(string email, string password);
  Task UpdateAsync(Patient patient);
  Task<List<Patient>> GetAllAsync();
+ Task DeleteAsync(int patientId);
  }
 }

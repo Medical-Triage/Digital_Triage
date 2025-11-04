@@ -1,8 +1,11 @@
 @page "/personal-info"
 @attribute [Authorize]
+@using System.Security.Claims
+@using Microsoft.JSInterop
 @inject IPatientService PatientService
 @inject IAuthHelper Auth
 @inject IHttpContextAccessor Http
+@inject NavigationManager Navigation
 
 <div class="container py-4">
     <div class="row mb-4">
@@ -125,6 +128,23 @@
                     </div>
                 </div>
 
+                @if (!Auth.IsDoctor(CurrentUser))
+                {
+                    <div class="card shadow-sm border-0 border-danger border-2 mb-4">
+                        <div class="card-body p-4">
+                            <h5 class="card-title mb-4 text-danger">
+                                <i class="bi bi-exclamation-triangle me-2"></i>Danger Zone
+                            </h5>
+                            <p class="text-muted mb-3">
+                                Once you delete your account, there is no going back. This will permanently delete your account and all associated information including medical data and reported issues.
+                            </p>
+                            <button type="button" class="btn btn-danger" @onclick="ShowDeleteConfirmation">
+                                <i class="bi bi-trash me-2"></i>Delete Account
+                            </button>
+                        </div>
+                    </div>
+                }
+
                 <div class="card shadow-sm border-0">
                     <div class="card-body p-4">
                         <h5 class="card-title mb-4">
@@ -209,12 +229,68 @@
 {
     <div class="toast-container position-fixed bottom-0 end-0 p-3">
         <div class="toast show" role="alert">
-            <div class="toast-header bg-success text-white">
-                <i class="bi bi-check-circle me-2"></i>
-                <strong class="me-auto">Success</strong>
-                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="toast" aria-label="Close"></button>
-            </div>
+            @if (isErrorMessage)
+            {
+                <div class="toast-header bg-danger text-white">
+                    <i class="bi bi-exclamation-triangle me-2"></i>
+                    <strong class="me-auto">Error</strong>
+                    <button type="button" class="btn-close btn-close-white" data-bs-dismiss="toast" aria-label="Close" @onclick="() => { message = null; isErrorMessage = false; }"></button>
+                </div>
+            }
+            else
+            {
+                <div class="toast-header bg-success text-white">
+                    <i class="bi bi-check-circle me-2"></i>
+                    <strong class="me-auto">Success</strong>
+                    <button type="button" class="btn-close btn-close-white" data-bs-dismiss="toast" aria-label="Close" @onclick="() => { message = null; isErrorMessage = false; }"></button>
+                </div>
+            }
             <div class="toast-body">@message</div>
+        </div>
+    </div>
+}
+
+@if (showDeleteModal)
+{
+    <div class="modal show d-block" tabindex="-1" style="background-color: rgba(0,0,0,0.5);">
+        <div class="modal-dialog modal-dialog-centered">
+            <div class="modal-content">
+                <div class="modal-header border-danger">
+                    <h5 class="modal-title text-danger">
+                        <i class="bi bi-exclamation-triangle me-2"></i>Confirm Account Deletion
+                    </h5>
+                    <button type="button" class="btn-close" @onclick="CancelDelete"></button>
+                </div>
+                <div class="modal-body">
+                    <p class="fw-semibold">Are you absolutely sure you want to delete your account?</p>
+                    <p class="text-muted">
+                        This action cannot be undone. This will permanently delete:
+                    </p>
+                    <ul class="text-muted">
+                        <li>Your account and personal information</li>
+                        <li>All medical data associated with your account</li>
+                        <li>All reported issues</li>
+                    </ul>
+                    <p class="text-danger fw-semibold">This action is permanent and irreversible.</p>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" @onclick="CancelDelete">
+                        <i class="bi bi-x-circle me-2"></i>Cancel
+                    </button>
+                    <button type="button" class="btn btn-danger" @onclick="ConfirmDelete" disabled="@isDeleting">
+                        @if (isDeleting)
+                        {
+                            <span class="spinner-border spinner-border-sm me-2" role="status"></span>
+                            <text>Deleting...</text>
+                        }
+                        else
+                        {
+                            <i class="bi bi-trash me-2"></i>
+                            <text>Yes, Delete My Account</text>
+                        }
+                    </button>
+                </div>
+            </div>
         </div>
     </div>
 }
@@ -224,13 +300,18 @@
  private List<PatientIssue>? issues;
  private IssueModel issueModel = new();
  private string? message;
+ private bool isErrorMessage = false;
+ private bool showDeleteModal = false;
+ private bool isDeleting = false;
 
  [Inject] public IPatientIssueService IssueService { get; set; } = default!;
+
+ private ClaimsPrincipal CurrentUser => Http.HttpContext?.User ?? new System.Security.Claims.ClaimsPrincipal(new System.Security.Claims.ClaimsIdentity());
 
  protected override async Task OnInitializedAsync()
  {
   Console.WriteLine("=== PersonalInfo.razor: OnInitializedAsync called ===");
-  var id = Auth.GetUserId(Http.HttpContext!.User);
+  var id = Auth.GetUserId(CurrentUser);
   if (!id.HasValue)
   {
    Console.WriteLine("No user ID found");
@@ -285,11 +366,59 @@
 
  private async Task AddIssue()
  {
-  var id = Auth.GetUserId(Http.HttpContext!.User);
+  var id = Auth.GetUserId(CurrentUser);
   if (!id.HasValue) return;
   await IssueService.CreateAsync(id.Value, issueModel.Title!, issueModel.Description!);
   issues = await IssueService.GetByPatientIdAsync(id.Value);
   issueModel = new();
+ }
+
+ private void ShowDeleteConfirmation()
+ {
+  showDeleteModal = true;
+ }
+
+ private void CancelDelete()
+ {
+  showDeleteModal = false;
+ }
+
+ private async Task ConfirmDelete()
+ {
+  if (isDeleting) return;
+
+  isDeleting = true;
+  isErrorMessage = false;
+  try
+  {
+   Console.WriteLine("=== PersonalInfo.razor: Deleting account directly via service ===");
+
+   if (patient == null)
+   {
+    Console.WriteLine("ERROR: Patient is not loaded");
+    isErrorMessage = true;
+    message = "We could not load your account. Please refresh and try again.";
+    showDeleteModal = false;
+    isDeleting = false;
+    return;
+   }
+
+   var userId = patient.Id;
+   Console.WriteLine($"Attempting to delete account for user ID: {userId}");
+   await PatientService.DeleteAsync(userId);
+
+   Console.WriteLine("Account deleted successfully, redirecting to logout...");
+   Navigation.NavigateTo("/Account/Logout", forceLoad: true);
+  }
+  catch (Exception ex)
+  {
+   Console.WriteLine($"Error deleting account: {ex.Message}");
+   Console.WriteLine(ex.StackTrace);
+   isErrorMessage = true;
+   message = "An error occurred while deleting your account. Please try again.";
+   showDeleteModal = false;
+   isDeleting = false;
+  }
  }
 
  public class IssueModel

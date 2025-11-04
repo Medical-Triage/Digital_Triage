@@ -9,20 +9,28 @@
 }
 
 .page {
-    display: grid;
-    grid-template-columns: 260px 1fr;
     min-height: 100vh;
 }
 
 .sidebar {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 260px;
+    height: 100vh;
+    z-index: 1000;
     background: linear-gradient(180deg, var(--nav-bg), var(--nav-bg-dark));
     color: var(--nav-text);
     box-shadow: 2px 0 10px rgba(0, 0, 0, 0.1);
+    overflow-y: auto;
+    overflow-x: hidden;
 }
 
 main {
+    margin-left: 260px;
     background: #f8f9fa;
     overflow-x: hidden;
+    min-height: 100vh;
 }
 
 .top-row {
@@ -40,8 +48,12 @@ main {
 
 /* Responsive adjustments */
 @media (max-width: 768px) {
-    .page {
-        grid-template-columns: 76px 1fr;
+    .sidebar {
+        width: 76px;
+    }
+    
+    main {
+        margin-left: 76px;
     }
     
     .content {
