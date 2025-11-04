@@ -32,7 +32,7 @@ builder.Services.AddAuthentication(CookieAuthenticationDefaults.AuthenticationSc
     .AddCookie(options =>
     {
         options.LoginPath = "/Account/Login";
-        options.LogoutPath = "/logout";
+        options.LogoutPath = "/Account/Logout";
         options.ExpireTimeSpan = TimeSpan.FromHours(8);
         options.Cookie.HttpOnly = true;
         options.Cookie.SameSite = SameSiteMode.Lax; // Changed to Lax for better compatibility

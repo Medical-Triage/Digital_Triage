@@ -176,10 +176,11 @@
         Nav.LocationChanged -= OnLocationChanged;
     }
 
-    private async Task Logout()
+    private void Logout()
     {
-        await Auth.SignOutAsync(Http.HttpContext!);
-        Nav.NavigateTo("/", true);
+        // Navigate to the Razor Page that performs logout
+        // forceLoad: true ensures a full page reload with a real HTTP request
+        Nav.NavigateTo("/Account/Logout", forceLoad: true);
     }
 
     private void NavigateTo(string href)
