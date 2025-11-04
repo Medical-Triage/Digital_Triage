@@ -5,6 +5,7 @@
 @inject NavigationManager Nav
 @inject IHttpContextAccessor Http
 @inject IAuthHelper Auth
+@inject IJSRuntime JSRuntime
 
 <div class="nav-shell">
     <!-- Brand Section -->
@@ -178,9 +179,15 @@
 
     private void Logout()
     {
+<<<<<<< HEAD
         // Navigate to the Razor Page that performs logout
         // forceLoad: true ensures a full page reload with a real HTTP request
         Nav.NavigateTo("/Account/Logout", forceLoad: true);
+=======
+        // Use JavaScript interop to force full page navigation to logout endpoint
+        // This prevents the circuit error by avoiding SignOutAsync from within Blazor
+        await JSRuntime.InvokeVoidAsync("window.location.replace", "/Account/Logout");
+>>>>>>> 1b88e64fd851c0a2a2a4c2ac17cd09369dc6fdb8
     }
 
     private void NavigateTo(string href)
