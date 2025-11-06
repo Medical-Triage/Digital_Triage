@@ -177,11 +177,11 @@
         Nav.LocationChanged -= OnLocationChanged;
     }
 
-    private async Task Logout()
+    private void Logout()
     {
-        // Use JavaScript interop to force full page navigation to logout endpoint
-        // This prevents the circuit error by avoiding SignOutAsync from within Blazor
-        await JSRuntime.InvokeVoidAsync("window.location.replace", "/Account/Logout");
+        // Navigate to the Razor Page that performs logout
+        // forceLoad: true ensures a full page reload with a real HTTP request
+        Nav.NavigateTo("/Account/Logout", forceLoad: true);
     }
 
     private void NavigateTo(string href)
