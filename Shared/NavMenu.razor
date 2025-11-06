@@ -179,6 +179,8 @@
 
     private void Logout()
     {
+        // Navigate to the Razor Page that performs logout
+        // forceLoad: true ensures a full page reload with a real HTTP request
         Nav.NavigateTo("/Account/Logout", forceLoad: true);
     }
 
