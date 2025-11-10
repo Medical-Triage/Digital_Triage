@@ -23,6 +23,7 @@ builder.Services.AddDbContext<MedicalTriageDbContext>(options =>
     options.UseSqlServer(configuration.GetConnectionString("MedicalTriageDb")));
 
 // DI for services
+builder.Services.AddScoped<IHospitalService, HospitalService>();
 builder.Services.AddScoped<IPatientService, PatientService>();
 builder.Services.AddScoped<IMedicalDataService, MedicalDataService>();
 builder.Services.AddScoped<IPatientIssueService, PatientIssueService>();

@@ -141,6 +141,17 @@
                             <span class="label">Admin Dashboard</span>
                         </button>
                     </li>
+                    <li>
+                        <button type="button"
+                                class="menu-link menu-card menu-card-admin @GetActiveClass("/hospital-management")"
+                                @onclick="@(() => NavigateTo("/hospital-management"))"
+                                aria-label="Hospital Management">
+                            <span class="icon-wrapper">
+                                <i class="bi bi-hospital"></i>
+                            </span>
+                            <span class="label">Hospital Management</span>
+                        </button>
+                    </li>
                 }
             }
         </ul>

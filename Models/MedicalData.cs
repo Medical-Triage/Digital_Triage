@@ -1,3 +1,5 @@
+using System;
+using System.Collections.Generic;
 using System.ComponentModel.DataAnnotations;
 
 namespace DigitalTriageApp.Models
@@ -21,6 +23,24 @@ namespace DigitalTriageApp.Models
  [MaxLength(1000)]
  public string? CurrentMedication { get; set; }
 
+ [MaxLength(1000)]
+ public string? PersonalHistory { get; set; }
+
+ [MaxLength(1000)]
+ public string? FamilyHistory { get; set; }
+
+ [MaxLength(500)]
+ public string? LivingConditions { get; set; }
+
+ [MaxLength(200)]
+ public string? IncidentLocation { get; set; }
+
+ [MaxLength(2000)]
+ public string? Symptoms { get; set; }
+
+ [MaxLength(2000)]
+ public string? PreliminaryDiagnosis { get; set; }
+
  [MaxLength(200)]
  public string? EmergencyContactName { get; set; }
 
@@ -32,7 +52,22 @@ namespace DigitalTriageApp.Models
  [MaxLength(100)]
  public string? TriageCategory { get; set; }
 
+ public EsiLevel? TriageLevel { get; set; }
+
+ public int? EstimatedWaitTimeMinutes { get; set; }
+
+ public bool IsConfidential { get; set; } = true;
+
+ public int? AuthorizedDoctorId { get; set; }
+ public DoctorProfile? AuthorizedDoctor { get; set; }
+
+ public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
+
+ public DateTime? UpdatedAt { get; set; }
+
  public int PatientId { get; set; }
  public Patient? Patient { get; set; }
+
+ public ICollection<MedicalFile> Files { get; set; } = new List<MedicalFile>();
  }
 }
