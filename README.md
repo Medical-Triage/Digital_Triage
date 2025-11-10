@@ -20,24 +20,20 @@ A modern medical triage platform built with ASP.NET Core Blazor Server that enab
 
 ### For Patients
 - **User Registration & Authentication**: Secure account creation with email and password (password hashing using BCrypt)
+- **Hospital Preference Management**: Search existing hospitals, filter by location, preview doctors assigned to each facility, or accept the automatically suggested closest hospital based on domicile
 - **Personal Information Management**: Store and update personal details including CNP, citizenship, place of birth, and domicile address
 - **Account Deletion**: Permanently delete account and all associated data with confirmation dialog (available in Personal Information page)
-- **Medical Information Management**: Record and manage medical data including:
-  - Blood type
-  - Allergies
-  - Chronic diseases
-  - Current medications
-  - Emergency contact information
-  - Last visit date
-  - Triage category
+- **Medical Information Management**: Record and manage medical data including detailed anamnesis, triage information (ESI level, estimated wait time), privacy controls, and attached medical files
 - **AI Triage Assistant**: Get preliminary medical triage recommendations based on symptoms (Preview mode - UI only)
 - **Patient Issues Tracking**: Submit and track medical issues/concerns
 
 ### For Doctors/Administrators
-- **Admin Dashboard**: Access to comprehensive patient data and medical records
+- **Dedicated Doctor Registration**: Create doctor accounts with specialization details via `/register/doctor`
+- **Hospital Management Workspace**: A dedicated `/hospital-management` page to create or update hospitals, search facilities, and manually join/leave memberships (creators are not joined automatically)
+- **Admin Dashboard**: Access to comprehensive patient data and medical records filtered by the hospitals the doctor currently belongs to
 - **Patient Management**: View all registered patients and their information
-- **Medical Records Access**: Full access to patient medical histories
-- **Streamlined Navigation**: Role-based menu visibility - Profile section hidden, only Administration section visible
+- **Medical Records Access**: Full access to patient medical histories, including confidential flags and authorized-doctor relationships
+- **Streamlined Navigation**: Role-based menu visibility - Profile section hidden, only Administration section visible (Admin Dashboard + Hospital Management)
 
 ## Prerequisites
 
@@ -133,175 +129,186 @@ This will create all necessary tables automatically.
 
 #### Option B: Using SQL Scripts (Manual Setup)
 
-If you prefer to create the database schema manually using SQL scripts, you can use the following SQL commands. This is useful if you want full control over the database creation or if you don't have Entity Framework tools installed.
+> ⚠️ **Prefer Entity Framework migrations.** Only use the script below if you must create the schema manually. After running it, insert migration rows manually into `__EFMigrationsHistory` so EF doesn’t try to recreate the tables.
 
-**Complete SQL Script:**
+**Complete SQL Script (schema current as of the latest update):**
 
 ```sql
--- Use the database
 USE MedicalTriageDB;
 GO
 
--- Create Domiciles table
-CREATE TABLE [dbo].[Domiciles] (
-    [Id] INT IDENTITY(1,1) NOT NULL,
-    [Country] NVARCHAR(100) NULL,
-    [County] NVARCHAR(100) NULL,
-    [City] NVARCHAR(100) NULL,
-    [Street] NVARCHAR(150) NULL,
-    [Number] NVARCHAR(20) NULL,
-    CONSTRAINT [PK_Domiciles] PRIMARY KEY CLUSTERED ([Id] ASC)
+/* Drop existing tables if you are rebuilding */
+IF OBJECT_ID('dbo.MedicalFiles','U') IS NOT NULL DROP TABLE dbo.MedicalFiles;
+IF OBJECT_ID('dbo.DoctorHospitalMemberships','U') IS NOT NULL DROP TABLE dbo.DoctorHospitalMemberships;
+IF OBJECT_ID('dbo.MedicalDatas','U') IS NOT NULL DROP TABLE dbo.MedicalDatas;
+IF OBJECT_ID('dbo.PatientIssues','U') IS NOT NULL DROP TABLE dbo.PatientIssues;
+IF OBJECT_ID('dbo.Hospitals','U') IS NOT NULL DROP TABLE dbo.Hospitals;
+IF OBJECT_ID('dbo.DoctorProfiles','U') IS NOT NULL DROP TABLE dbo.DoctorProfiles;
+IF OBJECT_ID('dbo.Patients','U') IS NOT NULL DROP TABLE dbo.Patients;
+IF OBJECT_ID('dbo.Domiciles','U') IS NOT NULL DROP TABLE dbo.Domiciles;
+IF OBJECT_ID('dbo.PlacesOfBirth','U') IS NOT NULL DROP TABLE dbo.PlacesOfBirth;
+
+/* Base tables */
+CREATE TABLE dbo.PlacesOfBirth
+(
+    Id       INT IDENTITY(1,1) PRIMARY KEY,
+    Country  NVARCHAR(100) NULL,
+    County   NVARCHAR(100) NULL,
+    City     NVARCHAR(100) NULL
 );
-GO
 
--- Create PlacesOfBirth table
-CREATE TABLE [dbo].[PlacesOfBirth] (
-    [Id] INT IDENTITY(1,1) NOT NULL,
-    [Country] NVARCHAR(100) NULL,
-    [County] NVARCHAR(100) NULL,
-    [City] NVARCHAR(100) NULL,
-    CONSTRAINT [PK_PlacesOfBirth] PRIMARY KEY CLUSTERED ([Id] ASC)
+CREATE TABLE dbo.Domiciles
+(
+    Id       INT IDENTITY(1,1) PRIMARY KEY,
+    Country  NVARCHAR(100) NULL,
+    County   NVARCHAR(100) NULL,
+    City     NVARCHAR(100) NULL,
+    Street   NVARCHAR(150) NULL,
+    Number   NVARCHAR(20)  NULL
 );
-GO
 
--- Create Patients table
-CREATE TABLE [dbo].[Patients] (
-    [Id] INT IDENTITY(1,1) NOT NULL,
-    [Email] NVARCHAR(200) NOT NULL,
-    [PasswordHash] NVARCHAR(MAX) NOT NULL,
-    [PhoneNumber] NVARCHAR(20) NULL,
-    [FirstName] NVARCHAR(100) NULL,
-    [LastName] NVARCHAR(100) NULL,
-    [Cnp] NVARCHAR(13) NULL,
-    [Serie] NVARCHAR(2) NULL,
-    [Nr] NVARCHAR(6) NULL,
-    [Citizenship] NVARCHAR(100) NULL,
-    [PlaceOfBirthId] INT NULL,
-    [DomicileId] INT NULL,
-    [Role] NVARCHAR(20) NULL,
-    CONSTRAINT [PK_Patients] PRIMARY KEY CLUSTERED ([Id] ASC),
-    CONSTRAINT [FK_Patients_Domiciles_DomicileId] FOREIGN KEY ([DomicileId]) 
-        REFERENCES [dbo].[Domiciles] ([Id]) ON DELETE NO ACTION,
-    CONSTRAINT [FK_Patients_PlacesOfBirth_PlaceOfBirthId] FOREIGN KEY ([PlaceOfBirthId]) 
-        REFERENCES [dbo].[PlacesOfBirth] ([Id]) ON DELETE NO ACTION
+CREATE TABLE dbo.Patients
+(
+    Id                   INT IDENTITY(1,1) PRIMARY KEY,
+    Email                NVARCHAR(200) NOT NULL,
+    PasswordHash         NVARCHAR(MAX) NOT NULL,
+    PhoneNumber          NVARCHAR(20) NULL,
+    FirstName            NVARCHAR(100) NULL,
+    LastName             NVARCHAR(100) NULL,
+    Cnp                  NVARCHAR(13) NULL,
+    Serie                NVARCHAR(2)  NULL,
+    Nr                   NVARCHAR(6)  NULL,
+    Citizenship          NVARCHAR(100) NULL,
+    PlaceOfBirthId       INT NULL,
+    DomicileId           INT NULL,
+    Role                 NVARCHAR(20) NULL,
+    PreferredHospitalId  INT NULL
 );
-GO
 
--- Create MedicalDatas table
-CREATE TABLE [dbo].[MedicalDatas] (
-    [Id] INT IDENTITY(1,1) NOT NULL,
-    [BloodType] NVARCHAR(5) NULL,
-    [Allergies] NVARCHAR(1000) NULL,
-    [ChronicDiseases] NVARCHAR(1000) NULL,
-    [CurrentMedication] NVARCHAR(1000) NULL,
-    [EmergencyContactName] NVARCHAR(200) NULL,
-    [EmergencyContactPhone] NVARCHAR(20) NULL,
-    [LastVisitDate] DATETIME2 NULL,
-    [TriageCategory] NVARCHAR(100) NULL,
-    [PatientId] INT NOT NULL,
-    CONSTRAINT [PK_MedicalDatas] PRIMARY KEY CLUSTERED ([Id] ASC),
-    CONSTRAINT [FK_MedicalDatas_Patients_PatientId] FOREIGN KEY ([PatientId]) 
-        REFERENCES [dbo].[Patients] ([Id]) ON DELETE CASCADE
+CREATE TABLE dbo.DoctorProfiles
+(
+    Id             INT IDENTITY(1,1) PRIMARY KEY,
+    UserId         INT NOT NULL,
+    Specialization NVARCHAR(150) NOT NULL
 );
-GO
 
--- Create PatientIssues table
-CREATE TABLE [dbo].[PatientIssues] (
-    [Id] INT IDENTITY(1,1) NOT NULL,
-    [PatientId] INT NOT NULL,
-    [Title] NVARCHAR(200) NULL,
-    [Description] NVARCHAR(2000) NULL,
-    [CreatedAt] DATETIMEOFFSET NOT NULL,
-    CONSTRAINT [PK_PatientIssues] PRIMARY KEY CLUSTERED ([Id] ASC),
-    CONSTRAINT [FK_PatientIssues_Patients_PatientId] FOREIGN KEY ([PatientId]) 
-        REFERENCES [dbo].[Patients] ([Id]) ON DELETE CASCADE
+CREATE TABLE dbo.Hospitals
+(
+    Id                 INT IDENTITY(1,1) PRIMARY KEY,
+    Name               NVARCHAR(200) NOT NULL,
+    Country            NVARCHAR(100) NULL,
+    County             NVARCHAR(100) NULL,
+    City               NVARCHAR(100) NULL,
+    Street             NVARCHAR(150) NULL,
+    Number             NVARCHAR(20)  NULL,
+    CreatedByDoctorId  INT NULL
 );
+
+CREATE TABLE dbo.DoctorHospitalMemberships
+(
+    Id          INT IDENTITY(1,1) PRIMARY KEY,
+    DoctorId    INT NOT NULL,
+    HospitalId  INT NOT NULL,
+    JoinedAt    DATETIME2 NOT NULL DEFAULT SYSUTCDATETIME(),
+    LeftAt      DATETIME2 NULL,
+    IsActive    BIT NOT NULL DEFAULT(1)
+);
+
+CREATE TABLE dbo.MedicalDatas
+(
+    Id                        INT IDENTITY(1,1) PRIMARY KEY,
+    BloodType                 NVARCHAR(5) NULL,
+    Allergies                 NVARCHAR(1000) NULL,
+    ChronicDiseases           NVARCHAR(1000) NULL,
+    CurrentMedication         NVARCHAR(1000) NULL,
+    PersonalHistory           NVARCHAR(1000) NULL,
+    FamilyHistory             NVARCHAR(1000) NULL,
+    LivingConditions          NVARCHAR(500) NULL,
+    IncidentLocation          NVARCHAR(200) NULL,
+    Symptoms                  NVARCHAR(2000) NULL,
+    PreliminaryDiagnosis      NVARCHAR(2000) NULL,
+    EmergencyContactName      NVARCHAR(200) NULL,
+    EmergencyContactPhone     NVARCHAR(20) NULL,
+    LastVisitDate             DATETIME2 NULL,
+    TriageCategory            NVARCHAR(100) NULL,
+    TriageLevel               INT NULL,
+    EstimatedWaitTimeMinutes  INT NULL,
+    IsConfidential            BIT NOT NULL DEFAULT(1),
+    AuthorizedDoctorId        INT NULL,
+    CreatedAt                 DATETIME2 NOT NULL DEFAULT SYSUTCDATETIME(),
+    UpdatedAt                 DATETIME2 NULL,
+    PatientId                 INT NOT NULL
+);
+
+CREATE TABLE dbo.MedicalFiles
+(
+    Id             INT IDENTITY(1,1) PRIMARY KEY,
+    MedicalDataId  INT NOT NULL,
+    FileName       NVARCHAR(255) NOT NULL,
+    FilePath       NVARCHAR(255) NOT NULL,
+    UploadDate     DATETIME2 NOT NULL DEFAULT SYSUTCDATETIME()
+);
+
+CREATE TABLE dbo.PatientIssues
+(
+    Id          INT IDENTITY(1,1) PRIMARY KEY,
+    PatientId   INT NOT NULL,
+    Title       NVARCHAR(200) NULL,
+    Description NVARCHAR(2000) NULL,
+    CreatedAt   DATETIMEOFFSET NOT NULL DEFAULT SYSDATETIMEOFFSET()
+);
+
+/* Foreign keys */
+ALTER TABLE dbo.Patients  ADD CONSTRAINT FK_Patients_PlacesOfBirth FOREIGN KEY (PlaceOfBirthId) REFERENCES dbo.PlacesOfBirth(Id) ON DELETE NO ACTION;
+ALTER TABLE dbo.Patients  ADD CONSTRAINT FK_Patients_Domiciles     FOREIGN KEY (DomicileId) REFERENCES dbo.Domiciles(Id) ON DELETE NO ACTION;
+ALTER TABLE dbo.Patients  ADD CONSTRAINT FK_Patients_Hospitals     FOREIGN KEY (PreferredHospitalId) REFERENCES dbo.Hospitals(Id) ON DELETE SET NULL;
+
+ALTER TABLE dbo.DoctorProfiles ADD CONSTRAINT FK_DoctorProfiles_Patients FOREIGN KEY (UserId) REFERENCES dbo.Patients(Id) ON DELETE CASCADE;
+ALTER TABLE dbo.Hospitals ADD CONSTRAINT FK_Hospitals_DoctorProfiles FOREIGN KEY (CreatedByDoctorId) REFERENCES dbo.DoctorProfiles(Id) ON DELETE SET NULL;
+ALTER TABLE dbo.DoctorHospitalMemberships ADD CONSTRAINT FK_DoctorHospitalMemberships_Doctors   FOREIGN KEY (DoctorId)   REFERENCES dbo.DoctorProfiles(Id) ON DELETE CASCADE;
+ALTER TABLE dbo.DoctorHospitalMemberships ADD CONSTRAINT FK_DoctorHospitalMemberships_Hospitals FOREIGN KEY (HospitalId) REFERENCES dbo.Hospitals(Id)       ON DELETE CASCADE;
+ALTER TABLE dbo.MedicalDatas ADD CONSTRAINT FK_MedicalDatas_Patients          FOREIGN KEY (PatientId)          REFERENCES dbo.Patients(Id)        ON DELETE CASCADE;
+ALTER TABLE dbo.MedicalDatas ADD CONSTRAINT FK_MedicalDatas_DoctorProfiles    FOREIGN KEY (AuthorizedDoctorId) REFERENCES dbo.DoctorProfiles(Id) ON DELETE SET NULL;
+ALTER TABLE dbo.MedicalFiles ADD CONSTRAINT FK_MedicalFiles_MedicalDatas FOREIGN KEY (MedicalDataId) REFERENCES dbo.MedicalDatas(Id) ON DELETE CASCADE;
+ALTER TABLE dbo.PatientIssues ADD CONSTRAINT FK_PatientIssues_Patients FOREIGN KEY (PatientId) REFERENCES dbo.Patients(Id) ON DELETE CASCADE;
+
+/* Indexes */
+CREATE INDEX IX_Patients_DomicileId        ON dbo.Patients(DomicileId);
+CREATE INDEX IX_Patients_PlaceOfBirthId    ON dbo.Patients(PlaceOfBirthId);
+CREATE INDEX IX_Patients_PreferredHospital ON dbo.Patients(PreferredHospitalId);
+CREATE INDEX IX_DoctorProfiles_UserId      ON dbo.DoctorProfiles(UserId);
+CREATE INDEX IX_Hospitals_CreatedByDoctor  ON dbo.Hospitals(CreatedByDoctorId);
+CREATE UNIQUE INDEX IX_DoctorHospitalMemberships_Doctor_Hospital_IsActive ON dbo.DoctorHospitalMemberships(DoctorId, HospitalId, IsActive);
+CREATE INDEX IX_MedicalDatas_PatientId        ON dbo.MedicalDatas(PatientId);
+CREATE INDEX IX_MedicalDatas_AuthorizedDoctor ON dbo.MedicalDatas(AuthorizedDoctorId);
+CREATE INDEX IX_MedicalFiles_MedicalDataId    ON dbo.MedicalFiles(MedicalDataId);
+CREATE INDEX IX_PatientIssues_PatientId       ON dbo.PatientIssues(PatientId);
 GO
 
--- Create indexes for better query performance
-CREATE NONCLUSTERED INDEX [IX_MedicalDatas_PatientId] 
-    ON [dbo].[MedicalDatas] ([PatientId] ASC);
-GO
-
-CREATE NONCLUSTERED INDEX [IX_PatientIssues_PatientId] 
-    ON [dbo].[PatientIssues] ([PatientId] ASC);
-GO
-
-CREATE NONCLUSTERED INDEX [IX_Patients_DomicileId] 
-    ON [dbo].[Patients] ([DomicileId] ASC);
-GO
-
-CREATE NONCLUSTERED INDEX [IX_Patients_PlaceOfBirthId] 
-    ON [dbo].[Patients] ([PlaceOfBirthId] ASC);
-GO
-
--- Verify all tables were created
-SELECT TABLE_NAME 
-FROM INFORMATION_SCHEMA.TABLES 
-WHERE TABLE_TYPE = 'BASE TABLE'
-ORDER BY TABLE_NAME;
-GO
-
-PRINT 'Database schema created successfully!';
+/* Optionally mark migrations as applied */
+IF OBJECT_ID('__EFMigrationsHistory','U') IS NULL
+BEGIN
+    CREATE TABLE __EFMigrationsHistory (MigrationId NVARCHAR(150) NOT NULL PRIMARY KEY, ProductVersion NVARCHAR(32) NOT NULL);
+END;
+MERGE __EFMigrationsHistory AS target
+USING (VALUES
+    ('20251102161050_InitialCreate','9.0.10'),
+    ('20251110154456_AddHospitalsAndDoctorProfiles','9.0.10'),
+    ('20251110172353_UpdateMedicalDataModel','9.0.10')
+) AS source(MigrationId, ProductVersion)
+ON target.MigrationId = source.MigrationId
+WHEN NOT MATCHED THEN INSERT (MigrationId, ProductVersion) VALUES (source.MigrationId, source.ProductVersion);
 GO
 ```
-
-**To execute this script:**
-
-1. Open **SQL Server Management Studio (SSMS)**
-2. Connect to your SQL Server instance
-3. Open a new query window
-4. Make sure you're connected to the `MedicalTriageDB` database (or run `USE MedicalTriageDB;` first)
-5. Copy and paste the entire script above
-6. Execute the script (Press F5 or click Execute)
 
 **What this script creates:**
-- `Domiciles` - Home address data
-- `PlacesOfBirth` - Birth location data
-- `Patients` - User accounts (patients and doctors) with foreign keys to Domiciles and PlacesOfBirth
-- `MedicalDatas` - Medical information records with foreign key to Patients (CASCADE delete)
-- `PatientIssues` - Patient-reported medical issues with foreign key to Patients (CASCADE delete)
-- All necessary indexes for optimal query performance
+- Full hospital/doctor infrastructure (including membership table with cascade deletes)
+- Extended `MedicalDatas` schema with anamnesis, triage (ESI) and privacy fields plus authorized doctor linkage
+- `MedicalFiles` table for attachments (cascade delete per medical record)
+- Role-based patient schema used by the current application
+- All necessary indexes
 
-**Note:** If you use the SQL script method, you should **NOT** run `dotnet ef database update` as it will try to apply migrations to an already-created database, which may cause conflicts.
-
-**Optional: Drop and Recreate Database (if needed)**
-
-If you need to completely reset the database (⚠️ **WARNING: This will delete all data**), you can use this script:
-
-```sql
--- Drop all foreign key constraints first
-USE MedicalTriageDB;
-GO
-
-IF EXISTS (SELECT * FROM sys.foreign_keys WHERE parent_object_id = OBJECT_ID('dbo.MedicalDatas'))
-    ALTER TABLE [dbo].[MedicalDatas] DROP CONSTRAINT [FK_MedicalDatas_Patients_PatientId];
-GO
-
-IF EXISTS (SELECT * FROM sys.foreign_keys WHERE parent_object_id = OBJECT_ID('dbo.PatientIssues'))
-    ALTER TABLE [dbo].[PatientIssues] DROP CONSTRAINT [FK_PatientIssues_Patients_PatientId];
-GO
-
-IF EXISTS (SELECT * FROM sys.foreign_keys WHERE parent_object_id = OBJECT_ID('dbo.Patients'))
-BEGIN
-    IF EXISTS (SELECT * FROM sys.foreign_keys WHERE name = 'FK_Patients_Domiciles_DomicileId')
-        ALTER TABLE [dbo].[Patients] DROP CONSTRAINT [FK_Patients_Domiciles_DomicileId];
-    IF EXISTS (SELECT * FROM sys.foreign_keys WHERE name = 'FK_Patients_PlacesOfBirth_PlaceOfBirthId')
-        ALTER TABLE [dbo].[Patients] DROP CONSTRAINT [FK_Patients_PlacesOfBirth_PlaceOfBirthId];
-END
-GO
-
--- Drop all tables
-DROP TABLE IF EXISTS [dbo].[MedicalDatas];
-DROP TABLE IF EXISTS [dbo].[PatientIssues];
-DROP TABLE IF EXISTS [dbo].[Patients];
-DROP TABLE IF EXISTS [dbo].[Domiciles];
-DROP TABLE IF EXISTS [dbo].[PlacesOfBirth];
-GO
-
-PRINT 'All tables dropped. You can now run the creation script again.';
-GO
-```
+After running the script, EF Core believes all migrations are applied thanks to the final MERGE statement. You can disable that part if you prefer to manage migration history manually.
 
 ### Step 4: Verify Database Setup
 
@@ -357,22 +364,23 @@ ORDER BY ParentTable, ForeignKeyName;
    - HTTPS: `https://localhost:7266`
    - HTTP: `http://localhost:5180`
 
-4. **First-time setup**: Create a new patient account using the registration page
+4. **First-time setup**: Create a new patient account at `/register`, or create a doctor account with specialization details at `/register/doctor`
 
 ## How the Application Works
 
 ### Authentication Flow
 
 1. **Registration**: 
-   - Users create an account with email and password
-   - Password is hashed using BCrypt before storage
-   - A default `MedicalData` record is created for new users
-   - Users are assigned the "Patient" role by default
+   - Patients sign up via `/register`; doctors sign up via `/register/doctor` and provide their medical specialization
+   - Passwords are hashed using BCrypt before storage
+   - A default `MedicalData` record is created for every new account
+   - Patients automatically receive the "Patient" role; doctors created through the doctor registration flow receive the "Doctor" role
+   - Patients without a preferred hospital are auto-assigned to the closest matching hospital based on domicile (if available)
 
 2. **Login**:
    - Users authenticate with email and password
    - Cookie-based session is created (expires after 8 hours)
-   - Special doctor accounts: emails ending with `@hospital.com` with password `hospital` are treated as doctors (demo mode)
+   - Doctor accounts use the same login endpoint after they have been created through the doctor registration flow
 
 3. **Authorization**:
    - Role-based access control using ASP.NET Core Authorization
@@ -385,6 +393,7 @@ ORDER BY ParentTable, ForeignKeyName;
 - **Razor Pages**: Traditional Razor Pages for login (located in `Pages/Account/Login.cshtml`)
 - **Services Layer**: Business logic separated into service classes:
   - `PatientService`: Patient CRUD operations and authentication
+  - `HospitalService`: Hospital creation, membership management, and patient hospital assignment
   - `MedicalDataService`: Medical data management
   - `PatientIssueService`: Issue tracking
 - **Data Layer**: Entity Framework Core with `MedicalTriageDbContext`
@@ -408,9 +417,14 @@ ORDER BY ParentTable, ForeignKeyName;
 
 4. **Admin Dashboard**:
    - Available only to users with "Doctor" role
-   - Provides comprehensive view of all patients and their medical records
+   - Provides a comprehensive view of patient medical records filtered by hospitals the doctor currently belongs to
 
-5. **User Interface Enhancements**:
+5. **Hospital & Doctor Collaboration**:
+   - Doctors manage hospitals on a dedicated `/hospital-management` page, manually joining/leaving facilities (creators are not auto-joined)
+   - Hospitals with no active doctors are automatically deleted to prevent orphaned facilities
+   - Patients can search existing hospitals, preview assigned doctors, and select their preferred facility
+
+6. **User Interface Enhancements**:
    - **Fixed Sidebar Navigation**: Navigation menu remains visible while scrolling page content
    - **Role-Based Menu**: Profile section (Personal Information, Medical Information, AI Triage) only visible to patients
    - Doctors see a streamlined menu with only Home, Admin Dashboard, and Exit options
@@ -431,6 +445,9 @@ DigitalTriageApp/
 ├── Migrations/             # EF Core migrations
 ├── Models/                 # Data models
 │   ├── Patient.cs
+│   ├── DoctorProfile.cs
+│   ├── DoctorHospitalMembership.cs
+│   ├── Hospital.cs
 │   ├── MedicalData.cs
 │   ├── PatientIssue.cs
 │   ├── PlaceOfBirth.cs
@@ -439,15 +456,22 @@ DigitalTriageApp/
 │   ├── Account/           # Login page (Razor Pages)
 │   ├── Index.razor        # Home page
 │   ├── Register.razor     # Registration
+│   ├── RegisterDoctor.razor # Doctor-specific registration
 │   ├── Login.razor        # Blazor login (alternative)
 │   ├── PersonalInfo.razor # Personal information management
 │   ├── MedicalInfo.razor  # Medical data management
 │   ├── AiChat.razor       # AI triage interface
-│   └── AdminDashboard.razor # Admin dashboard
+│   ├── AdminDashboard.razor # Doctor dashboard (patient insights)
+│   └── HospitalManagement.razor # Doctor-only hospital management workspace
 ├── Services/               # Business logic services
 │   ├── PatientService.cs
+│   ├── HospitalService.cs
 │   ├── MedicalDataService.cs
-│   └── PatientIssueService.cs
+│   ├── PatientIssueService.cs
+│   ├── IPatientService.cs
+│   ├── IHospitalService.cs
+│   ├── IMedicalDataService.cs
+│   └── IPatientIssueService.cs
 ├── Shared/                 # Shared components
 │   └── NavMenu.razor      # Navigation menu
 ├── wwwroot/                # Static files (CSS, JS)
@@ -477,88 +501,3 @@ Configured in `Program.cs`:
 - **SecurePolicy**: SameAsRequest (Development), Always (Production)
 
 ### Antiforgery Protection
-
-- Custom header: `X-CSRF-TOKEN`
-- Cookie name: `__RequestVerificationToken`
-- Protects against Cross-Site Request Forgery (CSRF) attacks
-
-## User Roles
-
-### Patient Role
-- Default role for registered users
-- Can access:
-  - Personal information management
-  - Medical information management
-  - AI Triage (preview)
-  - Patient issue submission
-  - Account deletion functionality
-- Navigation menu shows: Home, Profile section (Personal Information, Medical Information, AI Triage), and Exit
-
-### Doctor Role
-- Special role for healthcare professionals
-- **Demo credentials**: Any email ending with `@hospital.com` and password `hospital`
-- Can access:
-  - Admin Dashboard with full patient data access
-  - All patient data viewing and management
-- Navigation menu shows: Home, Administration section (Admin Dashboard), and Exit
-- Profile section (Personal Information, Medical Information, AI Triage) is hidden for doctors
-
-## Troubleshooting
-
-### Database Connection Issues
-
-**Problem**: Cannot connect to database
-- Verify SQL Server is running
-- Check connection string in `appsettings.Development.json`
-- Ensure database `MedicalTriageDB` exists
-- Verify Windows Authentication or SQL Authentication credentials
-
-**Solution**: Test connection using SQL Server Management Studio first
-
-### Migration Errors
-
-**Problem**: `dotnet ef database update` fails
-- Ensure you have Entity Framework Core tools installed:
-  ```bash
-  dotnet tool install --global dotnet-ef
-  ```
-- Verify connection string is correct
-- Check if database exists and is accessible
-
-### Authentication Issues
-
-**Problem**: Cannot login after registration
-- Check browser console for errors
-- Verify cookies are enabled
-- Clear browser cache and cookies
-- Check that password hashing is working (verify BCrypt package is installed)
-
-### Port Already in Use
-
-**Problem**: Port 7266 or 5180 already in use
-- Change ports in `Properties/launchSettings.json`
-- Or kill the process using the port:
-  ```bash
-  # Windows
-  netstat -ano | findstr :7266
-  taskkill /PID <PID> /F
-  ```
-
-## Development Notes
-
-- The application uses **Blazor Server** with Interactive Server rendering mode
-- All components are server-side rendered with SignalR for real-time updates
-- Password security: BCrypt hashing with automatic salt generation
-- CSRF protection is enabled for all forms using antiforgery tokens
-- Database migrations track schema changes - always run migrations after pulling updates
-
-## Future Enhancements
-
-- Full AI/ML integration for triage recommendations
-- Email verification for new registrations
-- Password reset functionality
-- Real-time chat with healthcare professionals
-- Appointment scheduling
-- Prescription management
-- Integration with external medical databases
-

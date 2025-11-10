@@ -4,6 +4,7 @@ using DigitalTriageApp.Data;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
 using Microsoft.EntityFrameworkCore.Metadata;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 
 #nullable disable
@@ -11,13 +12,15 @@ using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 namespace DigitalTriageApp.Migrations
 {
     [DbContext(typeof(MedicalTriageDbContext))]
-    partial class MedicalTriageDbContextModelSnapshot : ModelSnapshot
+    [Migration("20251110154456_AddHospitalsAndDoctorProfiles")]
+    partial class AddHospitalsAndDoctorProfiles
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        /// <inheritdoc />
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder
-                .HasAnnotation("ProductVersion", "9.0.10")
+                .HasAnnotation("ProductVersion", "8.0.10")
                 .HasAnnotation("Relational:MaxIdentifierLength", 128);
 
             SqlServerModelBuilderExtensions.UseIdentityColumns(modelBuilder);
@@ -52,7 +55,7 @@ namespace DigitalTriageApp.Migrations
                     b.HasIndex("DoctorId", "HospitalId", "IsActive")
                         .HasDatabaseName("IX_DoctorHospitalMembership_Doctor_Hospital_IsActive");
 
-                    b.ToTable("DoctorHospitalMemberships", (string)null);
+                    b.ToTable("DoctorHospitalMemberships");
                 });
 
             modelBuilder.Entity("DigitalTriageApp.Models.DoctorProfile", b =>
@@ -76,7 +79,7 @@ namespace DigitalTriageApp.Migrations
                     b.HasIndex("UserId")
                         .IsUnique();
 
-                    b.ToTable("DoctorProfiles", (string)null);
+                    b.ToTable("DoctorProfiles");
                 });
 
             modelBuilder.Entity("DigitalTriageApp.Models.Domicile", b =>
@@ -109,7 +112,7 @@ namespace DigitalTriageApp.Migrations
 
                     b.HasKey("Id");
 
-                    b.ToTable("Domiciles", (string)null);
+                    b.ToTable("Domiciles");
                 });
 
             modelBuilder.Entity("DigitalTriageApp.Models.Hospital", b =>
@@ -152,7 +155,7 @@ namespace DigitalTriageApp.Migrations
 
                     b.HasIndex("CreatedByDoctorId");
 
-                    b.ToTable("Hospitals", (string)null);
+                    b.ToTable("Hospitals");
                 });
 
             modelBuilder.Entity("DigitalTriageApp.Models.MedicalData", b =>
@@ -167,9 +170,6 @@ namespace DigitalTriageApp.Migrations
                         .HasMaxLength(1000)
                         .HasColumnType("nvarchar(1000)");
 
-                    b.Property<int?>("AuthorizedDoctorId")
-                        .HasColumnType("int");
-
                     b.Property<string>("BloodType")
                         .HasMaxLength(5)
                         .HasColumnType("nvarchar(5)");
@@ -177,11 +177,6 @@ namespace DigitalTriageApp.Migrations
                     b.Property<string>("ChronicDiseases")
                         .HasMaxLength(1000)
                         .HasColumnType("nvarchar(1000)");
-
-                    b.Property<DateTime>("CreatedAt")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("datetime2")
-                        .HasDefaultValueSql("GETUTCDATE()");
 
                     b.Property<string>("CurrentMedication")
                         .HasMaxLength(1000)
@@ -195,94 +190,21 @@ namespace DigitalTriageApp.Migrations
                         .HasMaxLength(20)
                         .HasColumnType("nvarchar(20)");
 
-                    b.Property<int?>("EstimatedWaitTimeMinutes")
-                        .HasColumnType("int");
-
-                    b.Property<string>("FamilyHistory")
-                        .HasMaxLength(1000)
-                        .HasColumnType("nvarchar(1000)");
-
-                    b.Property<string>("IncidentLocation")
-                        .HasMaxLength(200)
-                        .HasColumnType("nvarchar(200)");
-
-                    b.Property<bool>("IsConfidential")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("bit")
-                        .HasDefaultValue(true);
-
                     b.Property<DateTime?>("LastVisitDate")
                         .HasColumnType("datetime2");
 
-                    b.Property<string>("LivingConditions")
-                        .HasMaxLength(500)
-                        .HasColumnType("nvarchar(500)");
-
                     b.Property<int>("PatientId")
                         .HasColumnType("int");
-
-                    b.Property<string>("PersonalHistory")
-                        .HasMaxLength(1000)
-                        .HasColumnType("nvarchar(1000)");
-
-                    b.Property<string>("PreliminaryDiagnosis")
-                        .HasMaxLength(2000)
-                        .HasColumnType("nvarchar(2000)");
-
-                    b.Property<string>("Symptoms")
-                        .HasMaxLength(2000)
-                        .HasColumnType("nvarchar(2000)");
 
                     b.Property<string>("TriageCategory")
                         .HasMaxLength(100)
                         .HasColumnType("nvarchar(100)");
 
-                    b.Property<int?>("TriageLevel")
-                        .HasColumnType("int");
-
-                    b.Property<DateTime?>("UpdatedAt")
-                        .HasColumnType("datetime2");
-
                     b.HasKey("Id");
-
-                    b.HasIndex("AuthorizedDoctorId");
 
                     b.HasIndex("PatientId");
 
-                    b.ToTable("MedicalDatas", (string)null);
-                });
-
-            modelBuilder.Entity("DigitalTriageApp.Models.MedicalFile", b =>
-                {
-                    b.Property<int>("Id")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("int");
-
-                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("Id"));
-
-                    b.Property<string>("FileName")
-                        .IsRequired()
-                        .HasMaxLength(255)
-                        .HasColumnType("nvarchar(255)");
-
-                    b.Property<string>("FilePath")
-                        .IsRequired()
-                        .HasMaxLength(255)
-                        .HasColumnType("nvarchar(255)");
-
-                    b.Property<int>("MedicalDataId")
-                        .HasColumnType("int");
-
-                    b.Property<DateTime>("UploadDate")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("datetime2")
-                        .HasDefaultValueSql("GETUTCDATE()");
-
-                    b.HasKey("Id");
-
-                    b.HasIndex("MedicalDataId");
-
-                    b.ToTable("MedicalFiles", (string)null);
+                    b.ToTable("MedicalDatas");
                 });
 
             modelBuilder.Entity("DigitalTriageApp.Models.Patient", b =>
@@ -351,7 +273,7 @@ namespace DigitalTriageApp.Migrations
 
                     b.HasIndex("PreferredHospitalId");
 
-                    b.ToTable("Patients", (string)null);
+                    b.ToTable("Patients");
                 });
 
             modelBuilder.Entity("DigitalTriageApp.Models.PatientIssue", b =>
@@ -380,7 +302,7 @@ namespace DigitalTriageApp.Migrations
 
                     b.HasIndex("PatientId");
 
-                    b.ToTable("PatientIssues", (string)null);
+                    b.ToTable("PatientIssues");
                 });
 
             modelBuilder.Entity("DigitalTriageApp.Models.PlaceOfBirth", b =>
@@ -405,7 +327,7 @@ namespace DigitalTriageApp.Migrations
 
                     b.HasKey("Id");
 
-                    b.ToTable("PlacesOfBirth", (string)null);
+                    b.ToTable("PlacesOfBirth");
                 });
 
             modelBuilder.Entity("DigitalTriageApp.Models.DoctorHospitalMembership", b =>
@@ -450,31 +372,13 @@ namespace DigitalTriageApp.Migrations
 
             modelBuilder.Entity("DigitalTriageApp.Models.MedicalData", b =>
                 {
-                    b.HasOne("DigitalTriageApp.Models.DoctorProfile", "AuthorizedDoctor")
-                        .WithMany("AuthorizedMedicalData")
-                        .HasForeignKey("AuthorizedDoctorId")
-                        .OnDelete(DeleteBehavior.SetNull);
-
                     b.HasOne("DigitalTriageApp.Models.Patient", "Patient")
                         .WithMany("MedicalDatas")
                         .HasForeignKey("PatientId")
                         .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired();
 
-                    b.Navigation("AuthorizedDoctor");
-
                     b.Navigation("Patient");
-                });
-
-            modelBuilder.Entity("DigitalTriageApp.Models.MedicalFile", b =>
-                {
-                    b.HasOne("DigitalTriageApp.Models.MedicalData", "MedicalData")
-                        .WithMany("Files")
-                        .HasForeignKey("MedicalDataId")
-                        .OnDelete(DeleteBehavior.Cascade)
-                        .IsRequired();
-
-                    b.Navigation("MedicalData");
                 });
 
             modelBuilder.Entity("DigitalTriageApp.Models.Patient", b =>
@@ -514,8 +418,6 @@ namespace DigitalTriageApp.Migrations
 
             modelBuilder.Entity("DigitalTriageApp.Models.DoctorProfile", b =>
                 {
-                    b.Navigation("AuthorizedMedicalData");
-
                     b.Navigation("CreatedHospitals");
 
                     b.Navigation("HospitalMemberships");
@@ -526,11 +428,6 @@ namespace DigitalTriageApp.Migrations
                     b.Navigation("AssignedPatients");
 
                     b.Navigation("DoctorMemberships");
-                });
-
-            modelBuilder.Entity("DigitalTriageApp.Models.MedicalData", b =>
-                {
-                    b.Navigation("Files");
                 });
 
             modelBuilder.Entity("DigitalTriageApp.Models.Patient", b =>

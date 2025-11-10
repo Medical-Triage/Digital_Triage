@@ -1,11 +1,13 @@
 @page "/personal-info"
 @attribute [Authorize]
 @using System.Security.Claims
+@using DigitalTriageApp.Models
 @using Microsoft.JSInterop
 @inject IPatientService PatientService
 @inject IAuthHelper Auth
 @inject IHttpContextAccessor Http
 @inject NavigationManager Navigation
+@inject IHospitalService HospitalService
 
 <div class="container py-4">
     <div class="row mb-4">
@@ -220,6 +222,205 @@
                         </ul>
                     </div>
                 </div>
+
+                <div class="card shadow-sm border-0 mt-4">
+                    <div class="card-body p-4">
+                        <h5 class="card-title mb-3">
+                            <i class="bi bi-hospital me-2 text-primary"></i>Preferred Hospital
+                        </h5>
+                        <p class="text-muted mb-3">
+                            Select the hospital you want to visit for your current health issues. By default we assign the closest available hospital based on your domicile address.
+                        </p>
+                        <div class="alert alert-light border mb-4">
+                            <div class="d-flex align-items-start">
+                                <i class="bi bi-geo-alt text-primary fs-4 me-3"></i>
+                                <div>
+                                    <div class="fw-semibold">Current assignment</div>
+                                    @if (patient.PreferredHospital != null)
+                                    {
+                                        <div>@patient.PreferredHospital.Name</div>
+                                        <div class="text-muted small">
+                                            @FormatHospitalAddress(patient.PreferredHospital)
+                                        </div>
+                                    }
+                                    else
+                                    {
+                                        <div class="text-muted">No hospital assigned yet.</div>
+                                    }
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="row g-2 mb-3">
+                            <div class="col-lg-3 col-md-6">
+                                <label class="form-label fw-semibold">Search</label>
+                                <InputText class="form-control" placeholder="Hospital name" @bind-Value="hospitalSearchTerm" />
+                            </div>
+                            <div class="col-lg-3 col-md-6">
+                                <label class="form-label fw-semibold">Country</label>
+                                <InputText class="form-control" placeholder="Country" @bind-Value="hospitalFilterCountry" />
+                            </div>
+                            <div class="col-lg-3 col-md-6">
+                                <label class="form-label fw-semibold">County</label>
+                                <InputText class="form-control" placeholder="County" @bind-Value="hospitalFilterCounty" />
+                            </div>
+                            <div class="col-lg-3 col-md-6">
+                                <label class="form-label fw-semibold">City</label>
+                                <InputText class="form-control" placeholder="City" @bind-Value="hospitalFilterCity" />
+                            </div>
+                        </div>
+                        <div class="d-flex gap-2 mb-3">
+                            <button class="btn btn-outline-primary" type="button" @onclick="SearchHospitals" disabled="@isHospitalSearchBusy">
+                                @if (isHospitalSearchBusy)
+                                {
+                                    <span class="spinner-border spinner-border-sm" role="status"></span>
+                                    <span class="ms-2">Searching...</span>
+                                }
+                                else
+                                {
+                                    <span class="d-inline-flex align-items-center">
+                                        <i class="bi bi-search me-1"></i>
+                                        Apply filters
+                                    </span>
+                                }
+                            </button>
+                            <button class="btn btn-outline-secondary" type="button" @onclick="ClearHospitalFilters" disabled="@isHospitalSearchBusy">
+                                <i class="bi bi-x-circle me-1"></i>Clear filters
+                            </button>
+                        </div>
+                        @if (!string.IsNullOrEmpty(hospitalSearchError))
+                        {
+                            <div class="alert alert-danger py-2">@hospitalSearchError</div>
+                        }
+                        <div class="d-flex justify-content-between align-items-center mb-3">
+                            <span class="text-muted small">Showing @hospitalResults.Count result(s)</span>
+                            <button class="btn btn-link p-0" type="button" @onclick="AssignClosestHospital" disabled="@isAssigningHospital">
+                                @if (isAssigningHospital && assignMode == AssignMode.Nearest)
+                                {
+                                    <span class="spinner-border spinner-border-sm me-1" role="status"></span>
+                                }
+                                <i class="bi bi-geo-fill me-1"></i>Assign closest hospital
+                            </button>
+                        </div>
+                        <div class="list-group list-group-flush">
+                            @if (hospitalResults.Count == 0)
+                            {
+                                <div class="text-muted small">
+                                    Adjust the filters to find hospitals by location or name.
+                                </div>
+                            }
+                            else
+                            {
+                                foreach (var hospital in hospitalResults)
+                                {
+                                    var isCurrent = patient.PreferredHospitalId == hospital.Id;
+                                    <div class="list-group-item d-flex justify-content-between align-items-start">
+                                        <div>
+                                            <div class="fw-semibold">@hospital.Name</div>
+                                            <div class="text-muted small">@FormatHospitalAddress(hospital)</div>
+                                        </div>
+                                        <div class="btn-group btn-group-sm">
+                                            <button class="btn btn-outline-secondary"
+                                                    type="button"
+                                                    @onclick="() => PreviewHospitalAsync(hospital)"
+                                                    @onclick:stopPropagation="true">
+                                                <i class="bi bi-info-circle me-1"></i>Details
+                                            </button>
+                                            <button class="btn btn-sm @(isCurrent ? "btn-success" : "btn-outline-primary")"
+                                                    disabled="@isAssigningHospital"
+                                                    @onclick="() => AssignHospital(hospital)"
+                                                    @onclick:stopPropagation="true">
+                                                @if (isAssigningHospital && assignMode == AssignMode.Manual && pendingHospitalId == hospital.Id)
+                                                {
+                                                    <span class="spinner-border spinner-border-sm" role="status"></span>
+                                                }
+                                                else if (isCurrent)
+                                                {
+                                                    <i class="bi bi-check2-circle me-1"></i><span>Selected</span>
+                                                }
+                                                else
+                                                {
+                                                    <i class="bi bi-plus-circle me-1"></i><span>Select</span>
+                                                }
+                                            </button>
+                                        </div>
+                                    </div>
+                                }
+                            }
+                        </div>
+
+                        @if (previewHospital != null)
+                        {
+                            <div class="card mt-4">
+                                <div class="card-body">
+                                    <div class="d-flex justify-content-between align-items-start mb-3">
+                                        <div>
+                                            <h6 class="card-title mb-1">
+                                                <i class="bi bi-hospital me-2 text-primary"></i>@previewHospital.Name
+                                            </h6>
+                                            <div class="text-muted small">@FormatHospitalAddress(previewHospital)</div>
+                                        </div>
+                                        <button class="btn btn-sm btn-outline-secondary" type="button" @onclick="() => previewHospital = null">
+                                            <i class="bi bi-x-circle me-1"></i>Close
+                                        </button>
+                                    </div>
+
+                                    @if (isPreviewLoading)
+                                    {
+                                        <div class="d-flex justify-content-center py-3">
+                                            <div class="spinner-border text-primary" role="status">
+                                                <span class="visually-hidden">Loading doctors...</span>
+                                            </div>
+                                        </div>
+                                    }
+                                    else if (!string.IsNullOrEmpty(previewError))
+                                    {
+                                        <div class="alert alert-danger py-2">@previewError</div>
+                                    }
+                                    else if (previewDoctors.Count == 0)
+                                    {
+                                        <div class="alert alert-light border">
+                                            <i class="bi bi-info-circle me-2"></i>No doctors are currently associated with this hospital.
+                                        </div>
+                                    }
+                                    else
+                                    {
+                                        <div class="table-responsive">
+                                            <table class="table table-sm align-middle mb-0">
+                                                <thead class="table-light">
+                                                    <tr>
+                                                        <th scope="col">Doctor</th>
+                                                        <th scope="col">Specialization</th>
+                                                        <th scope="col">Email</th>
+                                                    </tr>
+                                                </thead>
+                                                <tbody>
+                                                    @foreach (var doctor in previewDoctors)
+                                                    {
+                                                        <tr>
+                                                            <td>@doctor.Name</td>
+                                                            <td>@doctor.Specialization</td>
+                                                            <td>
+                                                                @if (!string.IsNullOrWhiteSpace(doctor.Email))
+                                                                {
+                                                                    <a href="mailto:@doctor.Email">@doctor.Email</a>
+                                                                }
+                                                                else
+                                                                {
+                                                                    <span class="text-muted">N/A</span>
+                                                                }
+                                                            </td>
+                                                        </tr>
+                                                    }
+                                                </tbody>
+                                            </table>
+                                        </div>
+                                    }
+                                </div>
+                            </div>
+                        }
+                    </div>
+                </div>
             </div>
         </div>
     }
@@ -303,6 +504,20 @@
  private bool isErrorMessage = false;
  private bool showDeleteModal = false;
  private bool isDeleting = false;
+ private List<Hospital> hospitalResults = new();
+ private string hospitalSearchTerm = string.Empty;
+ private string hospitalFilterCountry = string.Empty;
+ private string hospitalFilterCounty = string.Empty;
+ private string hospitalFilterCity = string.Empty;
+ private string? hospitalSearchError;
+ private bool isHospitalSearchBusy;
+ private bool isAssigningHospital;
+ private AssignMode assignMode = AssignMode.Manual;
+ private int? pendingHospitalId;
+ private Hospital? previewHospital;
+ private bool isPreviewLoading;
+ private string? previewError;
+ private List<HospitalDoctorInfo> previewDoctors = new();
 
  [Inject] public IPatientIssueService IssueService { get; set; } = default!;
 
@@ -325,6 +540,10 @@
    patient.PlaceOfBirth ??= new PlaceOfBirth();
    patient.Domicile ??= new Domicile();
    Console.WriteLine("PlaceOfBirth and Domicile initialized");
+   if (patient.PreferredHospital != null)
+   {
+    hospitalResults = new List<Hospital> { patient.PreferredHospital };
+   }
   }
   else
   {
@@ -332,6 +551,8 @@
   }
   issues = await IssueService.GetByPatientIdAsync(id.Value);
   Console.WriteLine($"Loaded {issues?.Count ?? 0} issues");
+
+  await SearchHospitals();
  }
 
  private void HandleInvalidSubmit(EditContext editContext)
@@ -372,6 +593,194 @@
   issues = await IssueService.GetByPatientIdAsync(id.Value);
   issueModel = new();
  }
+
+private async Task SearchHospitals()
+{
+ hospitalSearchError = null;
+ try
+ {
+  isHospitalSearchBusy = true;
+  Console.WriteLine($"Searching hospitals with term '{hospitalSearchTerm}' and filters Country='{hospitalFilterCountry}', County='{hospitalFilterCounty}', City='{hospitalFilterCity}'");
+
+  var hasSearch = !string.IsNullOrWhiteSpace(hospitalSearchTerm);
+  var hasLocationFilters = !string.IsNullOrWhiteSpace(hospitalFilterCountry)
+      || !string.IsNullOrWhiteSpace(hospitalFilterCounty)
+      || !string.IsNullOrWhiteSpace(hospitalFilterCity);
+
+  if (!hasSearch && !hasLocationFilters)
+  {
+   hospitalResults = await HospitalService.GetAllAsync();
+  }
+  else
+  {
+   hospitalResults = await HospitalService.SearchHospitalsAsync(
+    hospitalSearchTerm,
+    hospitalFilterCountry,
+    hospitalFilterCounty,
+    hospitalFilterCity,
+    maxResults: 200);
+  }
+ 
+  if (patient?.PreferredHospital != null && !hospitalResults.Any(h => h.Id == patient.PreferredHospital.Id))
+  {
+   hospitalResults.Insert(0, patient.PreferredHospital);
+  }
+
+  if (previewHospital != null && hospitalResults.All(h => h.Id != previewHospital.Id))
+  {
+   previewHospital = null;
+   previewDoctors.Clear();
+   previewError = null;
+  }
+ }
+ catch (Exception ex)
+ {
+  Console.WriteLine($"Error searching hospitals: {ex}");
+  hospitalSearchError = "We couldn't load hospitals right now. Please try again.";
+ }
+ finally
+ {
+  isHospitalSearchBusy = false;
+ }
+}
+
+private async Task ClearHospitalFilters()
+{
+ hospitalSearchTerm = string.Empty;
+ hospitalFilterCountry = string.Empty;
+ hospitalFilterCounty = string.Empty;
+ hospitalFilterCity = string.Empty;
+ previewHospital = null;
+ previewDoctors.Clear();
+ previewError = null;
+
+ await SearchHospitals();
+}
+
+private async Task AssignHospital(Hospital hospital)
+{
+ if (patient == null)
+ {
+  return;
+ }
+
+ try
+ {
+  isAssigningHospital = true;
+  assignMode = AssignMode.Manual;
+  pendingHospitalId = hospital.Id;
+  Console.WriteLine($"Assigning hospital {hospital.Id} to patient {patient.Id}");
+  await HospitalService.SetPatientPreferredHospitalAsync(patient.Id, hospital.Id);
+  patient.PreferredHospitalId = hospital.Id;
+  patient.PreferredHospital = hospital;
+
+  if (!hospitalResults.Any(h => h.Id == hospital.Id))
+  {
+   hospitalResults.Insert(0, hospital);
+  }
+
+  isErrorMessage = false;
+  message = $"Preferred hospital updated to {hospital.Name}.";
+
+  await PreviewHospitalAsync(hospital);
+ }
+ catch (Exception ex)
+ {
+  Console.WriteLine($"Error assigning hospital: {ex}");
+  isErrorMessage = true;
+  message = "We couldn't update your preferred hospital. Please try again.";
+ }
+ finally
+ {
+  isAssigningHospital = false;
+  pendingHospitalId = null;
+ }
+}
+
+private async Task AssignClosestHospital()
+{
+ if (patient == null)
+ {
+  return;
+ }
+
+ try
+ {
+  isAssigningHospital = true;
+  assignMode = AssignMode.Nearest;
+  Console.WriteLine($"Assigning closest hospital for patient {patient.Id}");
+  var closest = await HospitalService.FindClosestHospitalAsync(patient.Domicile);
+  if (closest == null)
+  {
+   hospitalSearchError = "No hospitals are available yet. Please try again later.";
+   return;
+  }
+
+  await HospitalService.SetPatientPreferredHospitalAsync(patient.Id, closest.Id);
+  patient.PreferredHospitalId = closest.Id;
+  patient.PreferredHospital = closest;
+
+  if (!hospitalResults.Any(h => h.Id == closest.Id))
+  {
+   hospitalResults.Insert(0, closest);
+  }
+ 
+  isErrorMessage = false;
+  message = $"We assigned you to the closest hospital: {closest.Name}.";
+
+  await PreviewHospitalAsync(closest);
+ }
+ catch (Exception ex)
+ {
+  Console.WriteLine($"Error assigning closest hospital: {ex}");
+  hospitalSearchError = "We couldn't assign the closest hospital. Please try again.";
+ }
+ finally
+ {
+  isAssigningHospital = false;
+  assignMode = AssignMode.Manual;
+ }
+}
+
+private async Task PreviewHospitalAsync(Hospital hospital)
+{
+ previewError = null;
+ isPreviewLoading = true;
+ previewHospital = hospital;
+ previewDoctors = new List<HospitalDoctorInfo>();
+
+ try
+ {
+  var detail = await HospitalService.GetHospitalWithDoctorsAsync(hospital.Id);
+  if (detail == null)
+  {
+   previewError = "We couldn't load the hospital details.";
+   return;
+  }
+
+  previewHospital = detail;
+
+  previewDoctors = detail.DoctorMemberships?
+   .Where(m => m.IsActive && m.Doctor != null && m.Doctor.User != null)
+   .Select(m => new HospitalDoctorInfo
+   {
+    Name = BuildDoctorDisplayName(m.Doctor.User),
+    Email = m.Doctor.User.Email,
+    Specialization = m.Doctor.Specialization ?? "Unknown"
+   })
+   .OrderBy(d => d.Name)
+   .ToList() ?? new List<HospitalDoctorInfo>();
+ }
+ catch (Exception ex)
+ {
+  Console.WriteLine($"Error loading hospital details: {ex}");
+  previewError = "We couldn't load the doctor list. Please try again.";
+ }
+ finally
+ {
+  isPreviewLoading = false;
+ }
+}
 
  private void ShowDeleteConfirmation()
  {
@@ -420,12 +829,61 @@
    isDeleting = false;
   }
  }
-
+ 
  public class IssueModel
  {
   [Required, MaxLength(200)]
   public string? Title { get; set; }
   [Required, MaxLength(2000)]
   public string? Description { get; set; }
+ }
+ 
+private static string FormatHospitalAddress(Hospital hospital)
+{
+ if (hospital == null)
+ {
+  return string.Empty;
+ }
+
+ var parts = new[]
+ {
+  hospital.Street,
+  hospital.Number,
+  hospital.City,
+  hospital.County,
+  hospital.Country
+ }
+ .Where(part => !string.IsNullOrWhiteSpace(part));
+
+ return string.Join(", ", parts);
+}
+
+private static string BuildDoctorDisplayName(Patient? user)
+{
+ if (user == null)
+ {
+  return "Doctor";
+ }
+
+ var name = $"{user.FirstName ?? string.Empty} {user.LastName ?? string.Empty}".Trim();
+ if (string.IsNullOrWhiteSpace(name))
+ {
+  name = user.Email ?? "Doctor";
+ }
+
+ return name;
+}
+
+private class HospitalDoctorInfo
+{
+ public string Name { get; set; } = string.Empty;
+ public string Specialization { get; set; } = string.Empty;
+ public string? Email { get; set; }
+}
+ 
+ private enum AssignMode
+ {
+  Manual,
+  Nearest
  }
 }

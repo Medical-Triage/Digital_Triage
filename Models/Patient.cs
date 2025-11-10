@@ -1,3 +1,4 @@
+using System.Collections.Generic;
 using System.ComponentModel.DataAnnotations;
 using System.ComponentModel.DataAnnotations.Schema;
 
@@ -46,7 +47,12 @@ namespace DigitalTriageApp.Models
  [MaxLength(20)]
  public string? Role { get; set; }
 
- public ICollection<MedicalData> MedicalDatas { get; set; } = new List<MedicalData>();
+public int? PreferredHospitalId { get; set; }
+public Hospital? PreferredHospital { get; set; }
+
+public DoctorProfile? DoctorProfile { get; set; }
+
+public ICollection<MedicalData> MedicalDatas { get; set; } = new List<MedicalData>();
  public ICollection<PatientIssue> Issues { get; set; } = new List<PatientIssue>();
  }
 }

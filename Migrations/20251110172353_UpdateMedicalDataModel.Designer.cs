@@ -4,6 +4,7 @@ using DigitalTriageApp.Data;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
 using Microsoft.EntityFrameworkCore.Metadata;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 
 #nullable disable
@@ -11,9 +12,11 @@ using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 namespace DigitalTriageApp.Migrations
 {
     [DbContext(typeof(MedicalTriageDbContext))]
-    partial class MedicalTriageDbContextModelSnapshot : ModelSnapshot
+    [Migration("20251110172353_UpdateMedicalDataModel")]
+    partial class UpdateMedicalDataModel
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        /// <inheritdoc />
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder
@@ -52,7 +55,7 @@ namespace DigitalTriageApp.Migrations
                     b.HasIndex("DoctorId", "HospitalId", "IsActive")
                         .HasDatabaseName("IX_DoctorHospitalMembership_Doctor_Hospital_IsActive");
 
-                    b.ToTable("DoctorHospitalMemberships", (string)null);
+                    b.ToTable("DoctorHospitalMemberships");
                 });
 
             modelBuilder.Entity("DigitalTriageApp.Models.DoctorProfile", b =>
@@ -76,7 +79,7 @@ namespace DigitalTriageApp.Migrations
                     b.HasIndex("UserId")
                         .IsUnique();
 
-                    b.ToTable("DoctorProfiles", (string)null);
+                    b.ToTable("DoctorProfiles");
                 });
 
             modelBuilder.Entity("DigitalTriageApp.Models.Domicile", b =>
@@ -109,7 +112,7 @@ namespace DigitalTriageApp.Migrations
 
                     b.HasKey("Id");
 
-                    b.ToTable("Domiciles", (string)null);
+                    b.ToTable("Domiciles");
                 });
 
             modelBuilder.Entity("DigitalTriageApp.Models.Hospital", b =>
@@ -152,7 +155,7 @@ namespace DigitalTriageApp.Migrations
 
                     b.HasIndex("CreatedByDoctorId");
 
-                    b.ToTable("Hospitals", (string)null);
+                    b.ToTable("Hospitals");
                 });
 
             modelBuilder.Entity("DigitalTriageApp.Models.MedicalData", b =>
@@ -249,7 +252,7 @@ namespace DigitalTriageApp.Migrations
 
                     b.HasIndex("PatientId");
 
-                    b.ToTable("MedicalDatas", (string)null);
+                    b.ToTable("MedicalDatas");
                 });
 
             modelBuilder.Entity("DigitalTriageApp.Models.MedicalFile", b =>
@@ -274,15 +277,13 @@ namespace DigitalTriageApp.Migrations
                         .HasColumnType("int");
 
                     b.Property<DateTime>("UploadDate")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("datetime2")
-                        .HasDefaultValueSql("GETUTCDATE()");
+                        .HasColumnType("datetime2");
 
                     b.HasKey("Id");
 
                     b.HasIndex("MedicalDataId");
 
-                    b.ToTable("MedicalFiles", (string)null);
+                    b.ToTable("MedicalFiles");
                 });
 
             modelBuilder.Entity("DigitalTriageApp.Models.Patient", b =>
@@ -351,7 +352,7 @@ namespace DigitalTriageApp.Migrations
 
                     b.HasIndex("PreferredHospitalId");
 
-                    b.ToTable("Patients", (string)null);
+                    b.ToTable("Patients");
                 });
 
             modelBuilder.Entity("DigitalTriageApp.Models.PatientIssue", b =>
@@ -380,7 +381,7 @@ namespace DigitalTriageApp.Migrations
 
                     b.HasIndex("PatientId");
 
-                    b.ToTable("PatientIssues", (string)null);
+                    b.ToTable("PatientIssues");
                 });
 
             modelBuilder.Entity("DigitalTriageApp.Models.PlaceOfBirth", b =>
@@ -405,7 +406,7 @@ namespace DigitalTriageApp.Migrations
 
                     b.HasKey("Id");
 
-                    b.ToTable("PlacesOfBirth", (string)null);
+                    b.ToTable("PlacesOfBirth");
                 });
 
             modelBuilder.Entity("DigitalTriageApp.Models.DoctorHospitalMembership", b =>

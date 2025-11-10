@@ -13,6 +13,7 @@ namespace DigitalTriageApp.Services
  Task<Patient> RegisterAsync(Patient patient, string password);
  Task<Patient?> AuthenticateAsync(string email, string password);
  Task UpdateAsync(Patient patient);
+ Task<List<Patient>> GetByHospitalIdsAsync(IEnumerable<int> hospitalIds);
  Task<List<Patient>> GetAllAsync();
  Task DeleteAsync(int patientId);
  }

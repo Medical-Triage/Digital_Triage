@@ -141,6 +141,17 @@
                             <span class="label">Admin Dashboard</span>
                         </button>
                     </li>
+                    <li>
+                        <button type="button"
+                                class="menu-link menu-card menu-card-admin @GetActiveClass("/hospital-management")"
+                                @onclick="@(() => NavigateTo("/hospital-management"))"
+                                aria-label="Hospital Management">
+                            <span class="icon-wrapper">
+                                <i class="bi bi-hospital"></i>
+                            </span>
+                            <span class="label">Hospital Management</span>
+                        </button>
+                    </li>
                 }
             }
         </ul>
@@ -179,11 +190,6 @@
 
     private void Logout()
     {
-<<<<<<< HEAD
-=======
-        // Navigate to the Razor Page that performs logout
-        // forceLoad: true ensures a full page reload with a real HTTP request
->>>>>>> 050c224 (Merge pull request #3 from Medical-Triage/test)
         Nav.NavigateTo("/Account/Logout", forceLoad: true);
     }
 

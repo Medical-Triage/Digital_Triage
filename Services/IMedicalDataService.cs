@@ -9,5 +9,8 @@ namespace DigitalTriageApp.Services
  {
  Task<MedicalData?> GetByPatientIdAsync(int patientId);
  Task UpdateAsync(MedicalData data);
+ Task<MedicalFile> AddFileAsync(int medicalDataId, string fileName, string filePath);
+ Task RemoveFileAsync(int fileId);
+ Task<MedicalFile?> GetFileAsync(int fileId);
  }
 }
