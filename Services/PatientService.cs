@@ -232,6 +232,10 @@ namespace DigitalTriageApp.Services
 
             return await _db.Patients
                 .Include(p => p.MedicalDatas)
+                    .ThenInclude(md => md.Files)
+                .Include(p => p.MedicalDatas)
+                    .ThenInclude(md => md.AuthorizedDoctor)
+                        .ThenInclude(d => d!.User)
                 .Include(p => p.Issues)
                 .Include(p => p.PlaceOfBirth)
                 .Include(p => p.Domicile)
@@ -245,6 +249,10 @@ namespace DigitalTriageApp.Services
         {
             return _db.Patients
                 .Include(p => p.MedicalDatas)
+                    .ThenInclude(md => md.Files)
+                .Include(p => p.MedicalDatas)
+                    .ThenInclude(md => md.AuthorizedDoctor)
+                        .ThenInclude(d => d!.User)
                 .Include(p => p.Issues)
                 .Include(p => p.PlaceOfBirth)
                 .Include(p => p.Domicile)

@@ -316,6 +316,30 @@
                                                 <td>@(string.IsNullOrEmpty(medicalData.CurrentMedication) ? "None" : medicalData.CurrentMedication)</td>
                                             </tr>
                                             <tr>
+                                                <td class="fw-semibold">Symptoms:</td>
+                                                <td>@(string.IsNullOrWhiteSpace(medicalData.Symptoms) ? "None" : medicalData.Symptoms)</td>
+                                            </tr>
+                                            <tr>
+                                                <td class="fw-semibold">Incident Location:</td>
+                                                <td>@(medicalData.IncidentLocation ?? "N/A")</td>
+                                            </tr>
+                                            <tr>
+                                                <td class="fw-semibold">Preliminary Diagnosis:</td>
+                                                <td>@(string.IsNullOrWhiteSpace(medicalData.PreliminaryDiagnosis) ? "Not provided" : medicalData.PreliminaryDiagnosis)</td>
+                                            </tr>
+                                            <tr>
+                                                <td class="fw-semibold">Personal History:</td>
+                                                <td>@(string.IsNullOrWhiteSpace(medicalData.PersonalHistory) ? "Not provided" : medicalData.PersonalHistory)</td>
+                                            </tr>
+                                            <tr>
+                                                <td class="fw-semibold">Family History:</td>
+                                                <td>@(string.IsNullOrWhiteSpace(medicalData.FamilyHistory) ? "Not provided" : medicalData.FamilyHistory)</td>
+                                            </tr>
+                                            <tr>
+                                                <td class="fw-semibold">Living Conditions:</td>
+                                                <td>@(string.IsNullOrWhiteSpace(medicalData.LivingConditions) ? "Not provided" : medicalData.LivingConditions)</td>
+                                            </tr>
+                                            <tr>
                                                 <td class="fw-semibold">Emergency Contact:</td>
                                                 <td>@(medicalData.EmergencyContactName ?? "N/A") - @(medicalData.EmergencyContactPhone ?? "N/A")</td>
                                             </tr>
@@ -336,6 +360,75 @@
                                                     }
                                                 </td>
                                             </tr>
+                                            <tr>
+                                                <td class="fw-semibold">ESI Level:</td>
+                                                <td>@(medicalData.TriageLevel?.ToString() ?? "Not set")</td>
+                                            </tr>
+                                            <tr>
+                                                <td class="fw-semibold">Estimated Wait:</td>
+                                                <td>@(medicalData.EstimatedWaitTimeMinutes.HasValue ? $"{medicalData.EstimatedWaitTimeMinutes} minute(s)" : "Not estimated")</td>
+                                            </tr>
+                                            <tr>
+                                                <td class="fw-semibold">Confidential:</td>
+                                                <td>
+                                                    @if (medicalData.IsConfidential)
+                                                    {
+                                                        <span class="badge text-bg-danger"><i class="bi bi-lock-fill me-1"></i> Confidential</span>
+                                                    }
+                                                    else
+                                                    {
+                                                        <span class="badge text-bg-secondary"><i class="bi bi-unlock me-1"></i> Shared</span>
+                                                    }
+                                                </td>
+                                            </tr>
+                                            <tr>
+                                                <td class="fw-semibold">Authorized Doctor:</td>
+                                                <td>
+                                                    @if (medicalData.AuthorizedDoctor?.User != null)
+                                                    {
+                                                        <div>
+                                                            <i class="bi bi-person-check me-1"></i>@($"{medicalData.AuthorizedDoctor.User.FirstName} {medicalData.AuthorizedDoctor.User.LastName}".Trim())
+                                                        </div>
+                                                        <div class="text-muted small">
+                                                            @(string.IsNullOrWhiteSpace(medicalData.AuthorizedDoctor.Specialization)
+                                                                ? "Specialization not set"
+                                                                : medicalData.AuthorizedDoctor.Specialization)
+                                                        </div>
+                                                        <div class="text-muted small">
+                                                            @medicalData.AuthorizedDoctor.User.Email
+                                                        </div>
+                                                    }
+                                                    else
+                                                    {
+                                                        <span class="text-muted">No doctor assigned</span>
+                                                    }
+                                                </td>
+                                            </tr>
+                                            <tr>
+                                                <td class="fw-semibold">Record Timeline:</td>
+                                                <td class="text-muted small">
+                                                    <div><i class="bi bi-calendar-event me-1"></i>Created: @medicalData.CreatedAt.ToLocalTime().ToString("MMM dd, yyyy HH:mm")</div>
+                                                    <div><i class="bi bi-arrow-repeat me-1"></i>Updated: @(medicalData.UpdatedAt?.ToLocalTime().ToString("MMM dd, yyyy HH:mm") ?? "n/a")</div>
+                                                </td>
+                                            </tr>
+                                            @if (medicalData.Files?.Any() == true)
+                                            {
+                                                <tr>
+                                                    <td class="fw-semibold">Attachments:</td>
+                                                    <td>
+                                                        <ul class="list-unstyled mb-0 small">
+                                                            @foreach (var file in medicalData.Files.OrderByDescending(f => f.UploadDate))
+                                                            {
+                                                                <li class="mb-1">
+                                                                    <i class="bi bi-paperclip me-1"></i>
+                                                                    <a href="@($"/api/medical-files/download/{file.Id}")" target="_blank" rel="noopener">@file.FileName</a>
+                                                                    <span class="text-muted">(@file.UploadDate.ToLocalTime().ToString("MMM dd, yyyy HH:mm"))</span>
+                                                                </li>
+                                                            }
+                                                        </ul>
+                                                    </td>
+                                                </tr>
+                                            }
                                         </table>
                                     }
                                     @if(!selectedPatient.MedicalDatas.Any())

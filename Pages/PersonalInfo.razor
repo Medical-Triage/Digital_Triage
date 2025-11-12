@@ -123,6 +123,29 @@
                                 </div>
                             </div>
 
+                            @if (Auth.IsDoctor(CurrentUser) && patient.DoctorProfile != null)
+                            {
+                                <div class="border-top pt-4 mb-3">
+                                    <h6 class="fw-semibold mb-3">
+                                        <i class="bi bi-person-lines-fill me-2 text-primary"></i>Doctor Profile
+                                    </h6>
+                                    <div class="row g-3 mb-4">
+                                        <div class="col-md-6">
+                                            <label class="form-label fw-semibold">Specialization</label>
+                                            <InputText class="form-control" placeholder="Cardiology, Emergency Medicine, etc." @bind-Value="patient.DoctorProfile.Specialization" />
+                                        </div>
+                                        <div class="col-md-6">
+                                            <div class="alert alert-light border mb-0">
+                                                <i class="bi bi-info-circle me-2"></i>
+                                                <span class="small text-muted">
+                                                    Patients and hospitals see this specialization when assigning you to cases.
+                                                </span>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                            }
+
                             <button type="submit" class="btn btn-primary">
                                 <i class="bi bi-save me-2"></i>Update Information
                             </button>
@@ -539,6 +562,10 @@
    Console.WriteLine($"Patient loaded - Email: '{patient.Email}', FirstName: '{patient.FirstName}', LastName: '{patient.LastName}'");
    patient.PlaceOfBirth ??= new PlaceOfBirth();
    patient.Domicile ??= new Domicile();
+   if (Auth.IsDoctor(CurrentUser))
+   {
+    patient.DoctorProfile ??= new DoctorProfile { UserId = patient.Id };
+   }
    Console.WriteLine("PlaceOfBirth and Domicile initialized");
    if (patient.PreferredHospital != null)
    {
