@@ -245,9 +245,9 @@
  }
  
  Console.WriteLine("Checking individual field validation...");
- Console.WriteLine($"Email field valid: {!editContext.GetValidationMessages(() => model.Email).Any()}");
- Console.WriteLine($"Password field valid: {!editContext.GetValidationMessages(() => model.Password).Any()}");
- Console.WriteLine($"ConfirmPassword field valid: {!editContext.GetValidationMessages(() => model.ConfirmPassword).Any()}");
+Console.WriteLine($"Email field valid: {!editContext.GetValidationMessages(() => model.Email).Any()}");
+Console.WriteLine($"Password field valid: {!editContext.GetValidationMessages(() => model.Password!).Any()}");
+Console.WriteLine($"ConfirmPassword field valid: {!editContext.GetValidationMessages(() => model.ConfirmPassword!).Any()}");
  
  // Check if model references match
  Console.WriteLine($"Model references match: {ReferenceEquals(model, editContext.Model)}");
@@ -311,7 +311,7 @@
  
  Console.WriteLine($"Patient object created - Email: '{patient.Email}', FirstName: '{patient.FirstName}'");
  Console.WriteLine("Calling RegisterAsync...");
- await PatientService.RegisterAsync(patient, model.Password);
+await PatientService.RegisterAsync(patient, model.Password!);
  Console.WriteLine("Registration successful, navigating to login...");
  Nav.NavigateTo("/login", true);
  }

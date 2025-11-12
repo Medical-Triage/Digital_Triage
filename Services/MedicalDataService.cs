@@ -21,7 +21,7 @@ namespace DigitalTriageApp.Services
  return _db.MedicalDatas
  .Include(m => m.Files)
  .Include(m => m.AuthorizedDoctor)
- .ThenInclude(d => d.User)
+ .ThenInclude(d => d!.User)
  .FirstOrDefaultAsync(m => m.PatientId == patientId);
  }
 
