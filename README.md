@@ -22,17 +22,19 @@ A modern medical triage platform built with ASP.NET Core Blazor Server that enab
 - **User Registration & Authentication**: Secure account creation with email and password (password hashing using BCrypt)
 - **Hospital Preference Management**: Search existing hospitals, filter by location, preview doctors assigned to each facility, or accept the automatically suggested closest hospital based on domicile
 - **Personal Information Management**: Store and update personal details including CNP, citizenship, place of birth, and domicile address
+- **Doctor Profile Enrichment**: Doctors signing in as patients can maintain their specialization directly from the Personal Info page
 - **Account Deletion**: Permanently delete account and all associated data with confirmation dialog (available in Personal Information page)
-- **Medical Information Management**: Record and manage medical data including detailed anamnesis, triage information (ESI level, estimated wait time), privacy controls, and attached medical files
+- **Medical Information Management**: Record and manage comprehensive medical data, assign an authorized doctor, control confidentiality, capture triage metrics (ESI level, estimated wait time), and attach supporting medical files
+- **File Attachments**: Upload lab results or imaging to medical records with secure downloads and removal, stored under `wwwroot/uploads`
 - **AI Triage Assistant**: Get preliminary medical triage recommendations based on symptoms (Preview mode - UI only)
 - **Patient Issues Tracking**: Submit and track medical issues/concerns
 
 ### For Doctors/Administrators
 - **Dedicated Doctor Registration**: Create doctor accounts with specialization details via `/register/doctor`
 - **Hospital Management Workspace**: A dedicated `/hospital-management` page to create or update hospitals, search facilities, and manually join/leave memberships (creators are not joined automatically)
-- **Admin Dashboard**: Access to comprehensive patient data and medical records filtered by the hospitals the doctor currently belongs to
+- **Admin Dashboard**: Access to comprehensive patient data, medical histories, attachments, and triage insights filtered by the hospitals the doctor currently belongs to
 - **Patient Management**: View all registered patients and their information
-- **Medical Records Access**: Full access to patient medical histories, including confidential flags and authorized-doctor relationships
+- **Medical Records Access**: Review confidential flags, authorized-doctor relationships, supporting files, and detailed anamnesis for every patient
 - **Streamlined Navigation**: Role-based menu visibility - Profile section hidden, only Administration section visible (Admin Dashboard + Hospital Management)
 
 ## Prerequisites
@@ -47,7 +49,7 @@ Before running this application, ensure you have the following installed:
 ## Technology Stack
 
 - **Framework**: ASP.NET Core 8.0 (Blazor Server)
-- **Database**: SQL Server with Entity Framework Core 8.0.10
+- **Database**: SQL Server (default) or MySQL (configurable via `DatabaseProvider`)
 - **Authentication**: Cookie-based authentication with role-based authorization
 - **Password Hashing**: BCrypt.Net-Next 4.0.3
 - **UI Components**: Bootstrap 5 (via CDN), Bootstrap Icons
@@ -58,7 +60,7 @@ Before running this application, ensure you have the following installed:
 1. **Clone the repository**
    ```bash
    git clone <repository-url>
-   cd DigitalTriageApp
+   cd Program
    ```
 
 2. **Restore NuGet packages**
@@ -80,7 +82,7 @@ Before running this application, ensure you have the following installed:
 
 ## Database Configuration
 
-The application uses SQL Server as its database. Follow these steps to configure the database:
+The application supports **SQL Server** (default) and **MySQL**. Set the desired provider in `appsettings*.json` via the `DatabaseProvider` key (`"SqlServer"` or `"MySql"`). The following steps show the SQL Server setup; see the note below for MySQL configuration.
 
 ### Step 1: Create the Database
 
@@ -98,6 +100,7 @@ The application uses SQL Server as its database. Follow these steps to configure
 
    ```json
    {
+     "DatabaseProvider": "SqlServer",
      "ConnectionStrings": {
        "MedicalTriageDb": "Data Source=<YOUR_SERVER_NAME>\\<INSTANCE_NAME>;Initial Catalog=MedicalTriageDB;Integrated Security=True;Persist Security Info=False;Pooling=False;MultipleActiveResultSets=False;Encrypt=True;TrustServerCertificate=True;Command Timeout=0"
      }
@@ -110,8 +113,12 @@ The application uses SQL Server as its database. Follow these steps to configure
    - If using Windows Authentication, keep `Integrated Security=True`
    - For SQL Server Authentication, use:
      ```
-     Data Source=SERVER\\INSTANCE;Initial Catalog=MedicalTriageDB;User Id=username;Password=password;Encrypt=True;TrustServerCertificate=True;
+    Data Source=SERVER\\INSTANCE;Initial Catalog=MedicalTriageDB;User Id=username;Password=password;Encrypt=True;TrustServerCertificate=True;
      ```
+
+> **Using MySQL instead?**  
+> Set `"DatabaseProvider": "MySql"` and supply a Pomelo-compatible connection string, e.g.  
+> `server=localhost;port=3306;database=MedicalTriageDb;user=triage;password=StrongPassword!;AllowPublicKeyRetrieval=True;`
 
 ### Step 3: Create Database Schema
 
@@ -345,9 +352,9 @@ ORDER BY ParentTable, ForeignKeyName;
 
 ## Running the Application
 
-1. **Navigate to the project directory**
+1. **Navigate to the presentation project**
    ```bash
-   cd DigitalTriageApp
+   cd src/Presentation/DigitalTriage.Presentation
    ```
 
 2. **Run the application**
@@ -415,16 +422,21 @@ ORDER BY ParentTable, ForeignKeyName;
    - Currently in preview mode (UI placeholder)
    - Interface is ready for integration with AI/ML services
 
-4. **Admin Dashboard**:
-   - Available only to users with "Doctor" role
-   - Provides a comprehensive view of patient medical records filtered by hospitals the doctor currently belongs to
+4. **Medical Attachments & Privacy**:
+   - Patients can upload, download, and remove supporting files from their medical record
+   - Attachments are scoped to the owning patient and secured behind antiforgery-protected API endpoints
+   - Only the patient and the explicitly authorized doctor for a record can access confidential files
 
-5. **Hospital & Doctor Collaboration**:
+5. **Admin Dashboard**:
+   - Available only to users with "Doctor" role
+   - Provides a comprehensive view of patient medical records—including attachments and confidentiality status—filtered by hospitals the doctor currently belongs to
+
+6. **Hospital & Doctor Collaboration**:
    - Doctors manage hospitals on a dedicated `/hospital-management` page, manually joining/leaving facilities (creators are not auto-joined)
    - Hospitals with no active doctors are automatically deleted to prevent orphaned facilities
    - Patients can search existing hospitals, preview assigned doctors, and select their preferred facility
 
-6. **User Interface Enhancements**:
+7. **User Interface Enhancements**:
    - **Fixed Sidebar Navigation**: Navigation menu remains visible while scrolling page content
    - **Role-Based Menu**: Profile section (Personal Information, Medical Information, AI Triage) only visible to patients
    - Doctors see a streamlined menu with only Home, Admin Dashboard, and Exit options
@@ -432,52 +444,18 @@ ORDER BY ParentTable, ForeignKeyName;
 ## Project Structure
 
 ```
-DigitalTriageApp/
-├── Components/              # Blazor components
-│   ├── Layout/             # Layout components
-│   └── Pages/              # Shared page components
-├── Controllers/            # API controllers (Antiforgery, Example)
-├── Data/                   # Database context
-│   └── MedicalTriageDbContext.cs
-├── Helpers/                # Helper classes
-│   ├── AntiforgeryHelper.cs
-│   └── AuthHelper.cs
-├── Migrations/             # EF Core migrations
-├── Models/                 # Data models
-│   ├── Patient.cs
-│   ├── DoctorProfile.cs
-│   ├── DoctorHospitalMembership.cs
-│   ├── Hospital.cs
-│   ├── MedicalData.cs
-│   ├── PatientIssue.cs
-│   ├── PlaceOfBirth.cs
-│   └── Domicile.cs
-├── Pages/                  # Razor pages and Blazor pages
-│   ├── Account/           # Login page (Razor Pages)
-│   ├── Index.razor        # Home page
-│   ├── Register.razor     # Registration
-│   ├── RegisterDoctor.razor # Doctor-specific registration
-│   ├── Login.razor        # Blazor login (alternative)
-│   ├── PersonalInfo.razor # Personal information management
-│   ├── MedicalInfo.razor  # Medical data management
-│   ├── AiChat.razor       # AI triage interface
-│   ├── AdminDashboard.razor # Doctor dashboard (patient insights)
-│   └── HospitalManagement.razor # Doctor-only hospital management workspace
-├── Services/               # Business logic services
-│   ├── PatientService.cs
-│   ├── HospitalService.cs
-│   ├── MedicalDataService.cs
-│   ├── PatientIssueService.cs
-│   ├── IPatientService.cs
-│   ├── IHospitalService.cs
-│   ├── IMedicalDataService.cs
-│   └── IPatientIssueService.cs
-├── Shared/                 # Shared components
-│   └── NavMenu.razor      # Navigation menu
-├── wwwroot/                # Static files (CSS, JS)
-├── appsettings.json        # Production configuration
-├── appsettings.Development.json # Development configuration
-└── Program.cs              # Application entry point
+Program/
+├── src/
+│   ├── Domain/
+│   │   └── DigitalTriage.Domain/            # Core entities and value objects
+│   ├── Application/
+│   │   └── DigitalTriage.Application/       # Service/repository contracts and shared abstractions
+│   ├── Infrastructure/
+│   │   └── DigitalTriage.Infrastructure/    # EF Core DbContext, data services, DI extensions
+│   └── Presentation/
+│       └── DigitalTriage.Presentation/      # Blazor UI, controllers, static assets, configuration
+├── DigitalTriageApp.sln                     # Solution entry point
+└── README.md                                # Documentation
 ```
 
 ## Configuration
@@ -501,3 +479,8 @@ Configured in `Program.cs`:
 - **SecurePolicy**: SameAsRequest (Development), Always (Production)
 
 ### Antiforgery Protection
+
+- Blazor forms use the `<AntiforgeryToken />` component and the `AntiforgeryHelper` service to retrieve the token.
+- JavaScript helpers in `wwwroot/js/antiforgery.js` expose `postWithAntiforgery` for manual fetch requests.
+- The `MedicalFilesController` uploads, deletes and downloads require the antiforgery header (`X-CSRF-TOKEN`) and enforce the same protection used throughout the app.
+- Tokens are issued per-request and stored in the `__RequestVerificationToken` cookie; ensure this cookie is present when calling API endpoints from custom clients.
