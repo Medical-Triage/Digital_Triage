@@ -74,6 +74,26 @@ window.postWithAntiforgery = async function(url, data) {
     });
 };
 
+/**
+ * Gets selected option values from a multi-select element
+ * @param {HTMLElement} selectElement - The select element reference
+ * @returns {string[]} Array of selected option values
+ */
+window.getSelectedOptions = function(selectElement) {
+    if (!selectElement || !selectElement.options) {
+        return [];
+    }
+    
+    const selectedValues = [];
+    for (let i = 0; i < selectElement.options.length; i++) {
+        if (selectElement.options[i].selected) {
+            selectedValues.push(selectElement.options[i].value);
+        }
+    }
+    
+    return selectedValues;
+};
+
 // Export for use in Blazor
 window.BlazorAntiforgery = {
     getToken: window.getAntiforgeryToken,

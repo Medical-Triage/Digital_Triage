@@ -152,6 +152,17 @@
                             <span class="label">Hospital Management</span>
                         </button>
                     </li>
+                    <li>
+                        <button type="button"
+                                class="menu-link menu-card menu-card-admin @GetActiveClass("/statistics")"
+                                @onclick="@(() => NavigateTo("/statistics"))"
+                                aria-label="Statistics">
+                            <span class="icon-wrapper">
+                                <i class="bi bi-bar-chart-fill"></i>
+                            </span>
+                            <span class="label">Statistics</span>
+                        </button>
+                    </li>
                 }
             }
         </ul>
