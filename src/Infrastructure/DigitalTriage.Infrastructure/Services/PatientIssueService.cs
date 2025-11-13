@@ -37,10 +37,39 @@ internal sealed class PatientIssueService : IPatientIssueService
             PatientId = patientId,
             Title = title,
             Description = description,
-            CreatedAt = DateTimeOffset.UtcNow
+            IsActive = true, // Default to active
+            CreatedAt = DateTimeOffset.UtcNow,
+            LastUpdateDate = DateTimeOffset.UtcNow
         };
 
         _dbContext.PatientIssues.Add(issue);
+        await _dbContext.SaveChangesAsync();
+        return issue;
+    }
+
+    public async Task<PatientIssue> UpdateAsync(int issueId, string? problemType = null, EsiLevel? emergencyGrade = null, bool? isActive = null)
+    {
+        var issue = await _dbContext.PatientIssues
+            .FirstOrDefaultAsync(i => i.Id == issueId)
+            ?? throw new InvalidOperationException("Patient issue not found.");
+
+        if (problemType != null)
+        {
+            issue.ProblemType = problemType;
+        }
+
+        if (emergencyGrade.HasValue)
+        {
+            issue.EmergencyGrade = emergencyGrade;
+        }
+
+        if (isActive.HasValue)
+        {
+            issue.IsActive = isActive.Value;
+        }
+
+        issue.LastUpdateDate = DateTimeOffset.UtcNow;
+
         await _dbContext.SaveChangesAsync();
         return issue;
     }

@@ -33,9 +33,17 @@ A modern medical triage platform built with ASP.NET Core Blazor Server that enab
 - **Dedicated Doctor Registration**: Create doctor accounts with specialization details via `/register/doctor`
 - **Hospital Management Workspace**: A dedicated `/hospital-management` page to create or update hospitals, search facilities, and manually join/leave memberships (creators are not joined automatically)
 - **Admin Dashboard**: Access to comprehensive patient data, medical histories, attachments, and triage insights filtered by the hospitals the doctor currently belongs to
+- **Statistics Dashboard**: Advanced analytics page (`/statistics`) providing aggregated statistics on patients with active medical issues, including:
+  - Filterable by location (country, county, city) and hospital
+  - Time range filtering (last 7 days, 30 days, or custom range)
+  - Distribution by severity (Low, Moderate, High, Critical) and problem type
+  - Type × Severity heatmap matrix
+  - Top hospitals ranking
+  - Export functionality (CSV/JSON)
+  - All data respects doctor permissions (only shows hospitals the doctor is a member of)
 - **Patient Management**: View all registered patients and their information
 - **Medical Records Access**: Review confidential flags, authorized-doctor relationships, supporting files, and detailed anamnesis for every patient
-- **Streamlined Navigation**: Role-based menu visibility - Profile section hidden, only Administration section visible (Admin Dashboard + Hospital Management)
+- **Streamlined Navigation**: Role-based menu visibility - Profile section hidden, only Administration section visible (Admin Dashboard + Hospital Management + Statistics)
 
 ## Prerequisites
 
@@ -258,11 +266,15 @@ CREATE TABLE dbo.MedicalFiles
 
 CREATE TABLE dbo.PatientIssues
 (
-    Id          INT IDENTITY(1,1) PRIMARY KEY,
-    PatientId   INT NOT NULL,
-    Title       NVARCHAR(200) NULL,
-    Description NVARCHAR(2000) NULL,
-    CreatedAt   DATETIMEOFFSET NOT NULL DEFAULT SYSDATETIMEOFFSET()
+    Id              INT IDENTITY(1,1) PRIMARY KEY,
+    PatientId       INT NOT NULL,
+    Title           NVARCHAR(200) NULL,
+    Description     NVARCHAR(2000) NULL,
+    ProblemType     NVARCHAR(100) NULL,
+    EmergencyGrade  INT NULL,
+    IsActive        BIT NOT NULL DEFAULT 1,
+    CreatedAt       DATETIMEOFFSET NOT NULL DEFAULT SYSDATETIMEOFFSET(),
+    LastUpdateDate  DATETIMEOFFSET NOT NULL DEFAULT SYSDATETIMEOFFSET()
 );
 
 /* Foreign keys */
@@ -312,8 +324,77 @@ GO
 - Full hospital/doctor infrastructure (including membership table with cascade deletes)
 - Extended `MedicalDatas` schema with anamnesis, triage (ESI) and privacy fields plus authorized doctor linkage
 - `MedicalFiles` table for attachments (cascade delete per medical record)
+- Enhanced `PatientIssues` table with statistics fields:
+  - `ProblemType` (NVARCHAR(100)): Clinical category for filtering
+  - `EmergencyGrade` (INT): ESI level for severity classification
+  - `IsActive` (BIT): Status flag (active/resolved) - required for statistics visibility
+  - `LastUpdateDate` (DATETIMEOFFSET): Timestamp for time-based filtering
 - Role-based patient schema used by the current application
 - All necessary indexes
+
+**PatientIssues Statistics Fields:**
+- All new issues created through the application are automatically set to `IsActive = 1` and `LastUpdateDate = current time`
+- Existing issues need to be activated using the UPDATE script provided above
+- Issues with `IsActive = 0` will not appear in statistics
+- Issues without a `LastUpdateDate` will not appear in time-filtered statistics
+
+**Note for Existing Databases:** If you already have a database and need to add the new PatientIssues columns, run these ALTER TABLE commands:
+
+```sql
+USE MedicalTriageDB;
+GO
+
+-- Add ProblemType column (clinical category)
+ALTER TABLE dbo.PatientIssues
+ADD ProblemType NVARCHAR(100) NULL;
+
+-- Add EmergencyGrade column (ESI level - stored as INT, nullable)
+ALTER TABLE dbo.PatientIssues
+ADD EmergencyGrade INT NULL;
+
+-- Add IsActive column (default to 1 for existing records)
+ALTER TABLE dbo.PatientIssues
+ADD IsActive BIT NOT NULL DEFAULT 1;
+
+-- Add LastUpdateDate column (default to current time for existing records)
+ALTER TABLE dbo.PatientIssues
+ADD LastUpdateDate DATETIMEOFFSET NOT NULL DEFAULT SYSDATETIMEOFFSET();
+GO
+
+-- Activate all existing patient issues for statistics
+-- This ensures existing issues appear in the statistics dashboard
+UPDATE dbo.PatientIssues
+SET 
+    IsActive = 1,
+    LastUpdateDate = CASE 
+        WHEN LastUpdateDate IS NULL OR LastUpdateDate < CreatedAt 
+        THEN CreatedAt 
+        ELSE LastUpdateDate 
+    END
+WHERE IsActive IS NULL OR IsActive = 0;
+GO
+
+-- Verify the update
+SELECT 
+    COUNT(*) AS TotalIssues,
+    SUM(CASE WHEN IsActive = 1 THEN 1 ELSE 0 END) AS ActiveIssues,
+    SUM(CASE WHEN ProblemType IS NOT NULL THEN 1 ELSE 0 END) AS IssuesWithProblemType,
+    SUM(CASE WHEN EmergencyGrade IS NOT NULL THEN 1 ELSE 0 END) AS IssuesWithEmergencyGrade
+FROM dbo.PatientIssues;
+GO
+```
+
+**Important Notes:**
+- **PatientIssues Fields:**
+  - `ProblemType`: Clinical category (e.g., "Cardiac", "Respiratory", "Neurological") - optional but recommended for better filtering
+  - `EmergencyGrade`: ESI (Emergency Severity Index) level stored as INT (1=Resuscitation, 2=Critical, 3=Urgent, 4=NonUrgent, 5=Consult) - optional
+  - `IsActive`: Boolean flag indicating if the issue is still active (default: true) - **required for statistics**
+  - `LastUpdateDate`: Timestamp for tracking issue updates - **required for time-based filtering**
+- **Statistics Requirements:** For patient issues to appear in the statistics dashboard:
+  1. The issue must have `IsActive = 1`
+  2. The patient must have a `PreferredHospitalId` assigned
+  3. The doctor viewing statistics must be a member of that hospital
+  4. The issue's `LastUpdateDate` must fall within the selected time range (if a time filter is applied)
 
 After running the script, EF Core believes all migrations are applied thanks to the final MERGE statement. You can disable that part if you prefer to manage migration history manually.
 
@@ -328,7 +409,11 @@ SELECT TABLE_NAME FROM INFORMATION_SCHEMA.TABLES WHERE TABLE_TYPE = 'BASE TABLE'
 
 You should see all the tables listed:
 - `Domiciles`
+- `DoctorHospitalMemberships`
+- `DoctorProfiles`
+- `Hospitals`
 - `MedicalDatas`
+- `MedicalFiles`
 - `PatientIssues`
 - `Patients`
 - `PlacesOfBirth`
@@ -403,8 +488,10 @@ ORDER BY ParentTable, ForeignKeyName;
   - `HospitalService`: Hospital creation, membership management, and patient hospital assignment
   - `MedicalDataService`: Medical data management
   - `PatientIssueService`: Issue tracking
+  - `StatisticsService`: Statistics and analytics for patient issues with filtering capabilities
 - **Data Layer**: Entity Framework Core with `MedicalTriageDbContext`
 - **Helpers**: Utility classes for authentication and antiforgery protection
+- **API Controllers**: RESTful endpoints for statistics (`/api/stats/*`) accessible to doctors only
 
 ### Key Features Implementation
 
@@ -431,15 +518,37 @@ ORDER BY ParentTable, ForeignKeyName;
    - Available only to users with "Doctor" role
    - Provides a comprehensive view of patient medical records—including attachments and confidentiality status—filtered by hospitals the doctor currently belongs to
 
-6. **Hospital & Doctor Collaboration**:
+6. **Statistics Dashboard**:
+   - Accessible at `/statistics` for doctors only
+   - Displays aggregated statistics on patients with active medical issues
+   - **Filtering Capabilities**:
+     - Location-based filtering (country, county, or city level)
+     - Hospital-specific filtering (optional)
+     - Time range selection (last 7 days, 30 days, or custom date range)
+     - Multi-select filters for problem types and emergency grades (ESI levels)
+   - **Visualizations**:
+     - KPI cards showing total active issues, unique patients, and hospitals included
+     - Bar charts for severity distribution (Low, Moderate, High, Critical)
+     - Bar charts for problem type distribution
+     - Heatmap table showing Type × Severity matrix
+     - Top hospitals ranking table (when no hospital filter is applied)
+   - **Data Export**: Export filtered statistics in CSV or JSON format
+   - **Security**: All statistics respect doctor permissions—only shows data for hospitals the doctor is an active member of
+   - **Patient Issues Enhancement**: Patient issues now include:
+     - `ProblemType`: Clinical category (e.g., "Cardiac", "Respiratory", "Neurological")
+     - `EmergencyGrade`: ESI (Emergency Severity Index) level for triage prioritization
+     - `IsActive`: Boolean flag indicating if the issue is still active
+     - `LastUpdateDate`: Timestamp for tracking issue updates
+
+7. **Hospital & Doctor Collaboration**:
    - Doctors manage hospitals on a dedicated `/hospital-management` page, manually joining/leaving facilities (creators are not auto-joined)
    - Hospitals with no active doctors are automatically deleted to prevent orphaned facilities
    - Patients can search existing hospitals, preview assigned doctors, and select their preferred facility
 
-7. **User Interface Enhancements**:
+8. **User Interface Enhancements**:
    - **Fixed Sidebar Navigation**: Navigation menu remains visible while scrolling page content
    - **Role-Based Menu**: Profile section (Personal Information, Medical Information, AI Triage) only visible to patients
-   - Doctors see a streamlined menu with only Home, Admin Dashboard, and Exit options
+   - Doctors see a streamlined menu with Home, Admin Dashboard, Hospital Management, Statistics, and Exit options
 
 ## Project Structure
 
