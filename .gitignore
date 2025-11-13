@@ -26,9 +26,13 @@ artifacts/
 bld/
 [Ll]og/
 [Ll]ogs/
-TestResults/
-[Tt]est[Rr]esult*/
 [Bb]uild[Ll]og.*
+
+# Test project specific build artifacts
+tests/**/bin/
+tests/**/obj/
+tests/**/TestResults/
+tests/**/coverage/
 
 # Publish / deployment output
 [Pp]ublish/
@@ -48,6 +52,8 @@ project.lock.json
 project.fragment.lock.json
 project.assets.json
 project.nuget.cache
+**/project.assets.json
+**/project.nuget.cache
 
 # Coverage & analysis
 *.coverage
@@ -55,8 +61,23 @@ project.nuget.cache
 coverage*.json
 coverage*.xml
 coverage*.info
+coverage/
+**/coverage/
 BenchmarkDotNet.Artifacts/
 *.binlog
+
+# Test results & reports
+TestResults/
+[Tt]est[Rr]esult*/
+[Tt]est[Rr]esults/
+*.trx
+**/TestResults/
+**/test-results/
+**/TestResults.xml
+**/TestResults.json
+xunit.xml
+xunit*.xml
+*.testlog
 
 # Caches & temp files
 *.cache
@@ -116,4 +137,22 @@ wwwroot/uploads/
 wwwroot/dist/
 src/**/wwwroot/uploads/
 src/**/wwwroot/dist/
+
+# Test specific files
+*.testsettings
+*.testrunconfig
+.vs/TestResults/
+.vs/VSTestResults/
+**/.vs/TestResults/
+**/.vs/VSTestResults/
+
+# In-memory database files (if any are created)
+*.db-shm
+*.db-wal
+*.db-journal
+
+# IDE test runner files
+.idea/
+*.iml
+.vscode-test/
 
