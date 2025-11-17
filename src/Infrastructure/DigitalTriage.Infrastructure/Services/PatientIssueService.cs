@@ -73,5 +73,20 @@ internal sealed class PatientIssueService : IPatientIssueService
         await _dbContext.SaveChangesAsync();
         return issue;
     }
+
+    public async Task<bool> DeleteAsync(int issueId, int patientId)
+    {
+        var issue = await _dbContext.PatientIssues
+            .FirstOrDefaultAsync(i => i.Id == issueId && i.PatientId == patientId);
+
+        if (issue == null)
+        {
+            return false;
+        }
+
+        _dbContext.PatientIssues.Remove(issue);
+        await _dbContext.SaveChangesAsync();
+        return true;
+    }
 }
 

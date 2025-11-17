@@ -279,6 +279,126 @@ public class PatientIssueServiceTests : IDisposable
         Assert.Equal(originalIsActive, result.IsActive);
     }
 
+    [Fact]
+    public async Task DeleteAsync_WithValidIssue_DeletesIssue()
+    {
+        // Arrange
+        var patient = MockDataBuilder.CreatePatient();
+        _dbContext.Patients.Add(patient);
+        await _dbContext.SaveChangesAsync();
+
+        var issue = MockDataBuilder.CreatePatientIssue(patient.Id, "Test Issue");
+        _dbContext.PatientIssues.Add(issue);
+        await _dbContext.SaveChangesAsync();
+
+        var issueId = issue.Id;
+
+        // Act
+        var result = await _patientIssueService.DeleteAsync(issueId, patient.Id);
+
+        // Assert
+        Assert.True(result);
+        
+        var deletedIssue = await _dbContext.PatientIssues.FindAsync(issueId);
+        Assert.Null(deletedIssue);
+    }
+
+    [Fact]
+    public async Task DeleteAsync_WithNonExistentIssue_ReturnsFalse()
+    {
+        // Arrange
+        var patient = MockDataBuilder.CreatePatient();
+        _dbContext.Patients.Add(patient);
+        await _dbContext.SaveChangesAsync();
+
+        // Act
+        var result = await _patientIssueService.DeleteAsync(99999, patient.Id);
+
+        // Assert
+        Assert.False(result);
+    }
+
+    [Fact]
+    public async Task DeleteAsync_WithWrongPatientId_ReturnsFalse()
+    {
+        // Arrange
+        var patient1 = MockDataBuilder.CreatePatient();
+        var patient2 = MockDataBuilder.CreatePatient();
+        _dbContext.Patients.AddRange(patient1, patient2);
+        await _dbContext.SaveChangesAsync();
+
+        var issue = MockDataBuilder.CreatePatientIssue(patient1.Id, "Test Issue");
+        _dbContext.PatientIssues.Add(issue);
+        await _dbContext.SaveChangesAsync();
+
+        // Act - Try to delete issue belonging to patient1 using patient2's ID
+        var result = await _patientIssueService.DeleteAsync(issue.Id, patient2.Id);
+
+        // Assert
+        Assert.False(result);
+        
+        // Verify issue still exists
+        var existingIssue = await _dbContext.PatientIssues.FindAsync(issue.Id);
+        Assert.NotNull(existingIssue);
+    }
+
+    [Fact]
+    public async Task DeleteAsync_WithMultipleIssues_DeletesOnlySpecifiedIssue()
+    {
+        // Arrange
+        var patient = MockDataBuilder.CreatePatient();
+        _dbContext.Patients.Add(patient);
+        await _dbContext.SaveChangesAsync();
+
+        var issue1 = MockDataBuilder.CreatePatientIssue(patient.Id, "Issue 1");
+        var issue2 = MockDataBuilder.CreatePatientIssue(patient.Id, "Issue 2");
+        var issue3 = MockDataBuilder.CreatePatientIssue(patient.Id, "Issue 3");
+        _dbContext.PatientIssues.AddRange(issue1, issue2, issue3);
+        await _dbContext.SaveChangesAsync();
+
+        // Act
+        var result = await _patientIssueService.DeleteAsync(issue2.Id, patient.Id);
+
+        // Assert
+        Assert.True(result);
+        
+        var remainingIssues = await _dbContext.PatientIssues
+            .Where(i => i.PatientId == patient.Id)
+            .ToListAsync();
+        
+        Assert.Equal(2, remainingIssues.Count);
+        Assert.Contains(remainingIssues, i => i.Id == issue1.Id);
+        Assert.Contains(remainingIssues, i => i.Id == issue3.Id);
+        Assert.DoesNotContain(remainingIssues, i => i.Id == issue2.Id);
+    }
+
+    [Fact]
+    public async Task DeleteAsync_WithIssueFromDifferentPatient_DoesNotDelete()
+    {
+        // Arrange
+        var patient1 = MockDataBuilder.CreatePatient();
+        var patient2 = MockDataBuilder.CreatePatient();
+        _dbContext.Patients.AddRange(patient1, patient2);
+        await _dbContext.SaveChangesAsync();
+
+        var issue1 = MockDataBuilder.CreatePatientIssue(patient1.Id, "Patient 1 Issue");
+        var issue2 = MockDataBuilder.CreatePatientIssue(patient2.Id, "Patient 2 Issue");
+        _dbContext.PatientIssues.AddRange(issue1, issue2);
+        await _dbContext.SaveChangesAsync();
+
+        // Act - Try to delete patient2's issue using patient1's ID
+        var result = await _patientIssueService.DeleteAsync(issue2.Id, patient1.Id);
+
+        // Assert
+        Assert.False(result);
+        
+        // Verify both issues still exist
+        var allIssues = await _dbContext.PatientIssues.ToListAsync();
+        Assert.Equal(2, allIssues.Count);
+        Assert.Contains(allIssues, i => i.Id == issue1.Id);
+        Assert.Contains(allIssues, i => i.Id == issue2.Id);
+    }
+
     public void Dispose()
     {
         _dbContext.Dispose();

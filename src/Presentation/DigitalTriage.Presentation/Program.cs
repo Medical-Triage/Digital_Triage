@@ -1,4 +1,5 @@
 using DigitalTriage.Presentation.Common.Helpers;
+using Microsoft.AspNetCore.Authentication;
 using Microsoft.AspNetCore.Authentication.Cookies;
 using Microsoft.AspNetCore.Components.Authorization;
 using DigitalTriage.Infrastructure;
@@ -13,7 +14,10 @@ builder.Services.AddCascadingAuthenticationState();
 
 builder.Services.AddInfrastructure(builder.Configuration);
 
-builder.Services.AddAuthentication(CookieAuthenticationDefaults.AuthenticationScheme)
+var authBuilder = builder.Services.AddAuthentication(options =>
+    {
+        options.DefaultScheme = CookieAuthenticationDefaults.AuthenticationScheme;
+    })
     .AddCookie(options =>
     {
         options.LoginPath = "/Account/Login";
@@ -25,6 +29,38 @@ builder.Services.AddAuthentication(CookieAuthenticationDefaults.AuthenticationSc
             ? CookieSecurePolicy.SameAsRequest
             : CookieSecurePolicy.Always;
     });
+
+// Only add Microsoft Account authentication if ClientId and ClientSecret are configured
+var clientId = builder.Configuration["MicrosoftGraph:ClientId"];
+var clientSecret = builder.Configuration["MicrosoftGraph:ClientSecret"];
+
+if (!string.IsNullOrWhiteSpace(clientId) && !string.IsNullOrWhiteSpace(clientSecret))
+{
+    authBuilder.AddMicrosoftAccount(options =>
+    {
+        options.ClientId = clientId;
+        options.ClientSecret = clientSecret;
+        options.CallbackPath = "/signin-microsoft";
+        options.SaveTokens = true;
+        options.Scope.Add("https://graph.microsoft.com/Mail.Send");
+        options.Scope.Add("https://graph.microsoft.com/User.Read");
+        options.Scope.Add("offline_access");
+        
+        // Set redirect URI after authentication
+        options.Events.OnTicketReceived = async context =>
+        {
+            // The tokens are saved automatically when SaveTokens = true
+            // We'll handle token storage in the controller after redirect
+            await Task.CompletedTask;
+        };
+    });
+    
+    // Set Microsoft as the default challenge scheme only if configured
+    builder.Services.Configure<AuthenticationOptions>(options =>
+    {
+        options.DefaultChallengeScheme = "Microsoft";
+    });
+}
 
 builder.Services.AddAuthorization(options =>
 {

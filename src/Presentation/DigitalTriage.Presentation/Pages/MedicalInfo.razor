@@ -13,6 +13,8 @@
 @inject AntiforgeryHelper Antiforgery
 @inject HttpClient HttpClient
 @inject NavigationManager Navigation
+@inject IFamilyMedicService FamilyMedicService
+@inject ILogger<MedicalInfo> _logger
 
 <div class="container py-4">
     <div class="row mb-4">
@@ -224,6 +226,129 @@
                                 <div class="row">
                                     <div class="col-12">
                                         <h5 class="section-title mb-3">
+                                            <i class="bi bi-person-badge me-2 text-danger"></i>Family Medic
+                                        </h5>
+                                    </div>
+                                </div>
+
+                                <div class="row g-3 mb-4">
+                                    <div class="col-md-6">
+                                        <label class="form-label fw-semibold">
+                                            <i class="bi bi-envelope me-1"></i>Family Medic Email
+                                        </label>
+                                        <InputText class="form-control" placeholder="doctor@example.com" @bind-Value="familyMedicEmail" />
+                                        <small class="text-muted">Enter your family doctor's email address</small>
+                                    </div>
+                                    <div class="col-md-6">
+                                        <label class="form-label fw-semibold">Status</label>
+                                        @if (familyMedicRequestStatus == "Pending")
+                                        {
+                                            <div class="alert alert-warning py-2 mb-0">
+                                                <i class="bi bi-clock-history me-1"></i>Request pending approval
+                                            </div>
+                                        }
+                                        else if (familyMedicRequestStatus == "Accepted" && patient?.FamilyMedicDoctorId.HasValue == true)
+                                        {
+                                            <div class="alert alert-success py-2 mb-0">
+                                                <i class="bi bi-check-circle me-1"></i>Family medic assigned
+                                            </div>
+                                        }
+                                        else if (familyMedicRequestStatus == "Rejected")
+                                        {
+                                            <div class="alert alert-danger py-2 mb-0">
+                                                <i class="bi bi-x-circle me-1"></i>Request was rejected
+                                            </div>
+                                        }
+                                        else
+                                        {
+                                            <div class="alert alert-light py-2 mb-0">
+                                                <i class="bi bi-info-circle me-1"></i>No family medic assigned
+                                            </div>
+                                        }
+                                    </div>
+                                </div>
+
+                                @if (!string.IsNullOrEmpty(familyMedicError))
+                                {
+                                    <div class="alert alert-danger py-2 mb-3">
+                                        <i class="bi bi-exclamation-circle me-1"></i>@familyMedicError
+                                    </div>
+                                }
+
+                                <div class="d-flex gap-2 mb-3">
+                                    <button class="btn btn-primary" type="button" @onclick="HandleRequestFamilyMedic" disabled="@(isRequestingFamilyMedic || string.IsNullOrWhiteSpace(familyMedicEmail))">
+                                        @if (isRequestingFamilyMedic)
+                                        {
+                                            <span class="spinner-border spinner-border-sm me-2" role="status"></span>
+                                        }
+                                        else
+                                        {
+                                            <i class="bi bi-send me-2"></i>
+                                        }
+                                        Request Family Medic
+                                    </button>
+                                    @if (patient?.FamilyMedicDoctorId.HasValue == true)
+                                    {
+                                        <button class="btn btn-outline-danger" type="button" @onclick="HandleRemoveFamilyMedic" disabled="@isRemovingFamilyMedic">
+                                            @if (isRemovingFamilyMedic)
+                                            {
+                                                <span class="spinner-border spinner-border-sm me-2" role="status"></span>
+                                            }
+                                            else
+                                            {
+                                                <i class="bi bi-x-circle me-2"></i>
+                                            }
+                                            Remove Family Medic
+                                        </button>
+                                    }
+                                </div>
+
+                                <div class="border-top pt-3 mt-3">
+                                    <h6 class="fw-semibold mb-3">
+                                        <i class="bi bi-envelope-at me-2 text-danger"></i>Outlook Integration
+                                    </h6>
+                                    <p class="small text-muted mb-3">
+                                        Connect your Outlook account to send medical issues to your family medic via email.
+                                    </p>
+                                    @if (hasOutlookConnected)
+                                    {
+                                        <div class="alert alert-success py-2 mb-3">
+                                            <i class="bi bi-check-circle me-1"></i>Outlook account connected successfully
+                                        </div>
+                                        <button class="btn btn-outline-danger btn-sm" type="button" @onclick="HandleDisconnectOutlook" disabled="@isDisconnectingOutlook">
+                                            @if (isDisconnectingOutlook)
+                                            {
+                                                <span class="spinner-border spinner-border-sm me-1" role="status"></span>
+                                            }
+                                            else
+                                            {
+                                                <i class="bi bi-x-circle me-1"></i>
+                                            }
+                                            Disconnect Outlook
+                                        </button>
+                                    }
+                                    else
+                                    {
+                                        <div class="alert alert-warning py-2 mb-3">
+                                            <i class="bi bi-exclamation-triangle me-1"></i>Outlook account not connected
+                                        </div>
+                                        <a class="btn btn-primary btn-sm" href="/api/outlook/connect">
+                                            <i class="bi bi-microsoft me-1"></i>Connect Outlook Account
+                                        </a>
+                                    }
+                                    @if (!string.IsNullOrEmpty(outlookError))
+                                    {
+                                        <div class="alert alert-danger py-2 mt-2 mb-0">
+                                            <i class="bi bi-exclamation-circle me-1"></i>@outlookError
+                                        </div>
+                                    }
+                                </div>
+                            </div>
+
+                            <div class="border-top pt-4 mb-3">
+                                <div class="row">
+                                    <div class="col-12">
+                                        <h5 class="section-title mb-3">
                                             <i class="bi bi-calendar-check me-2 text-danger"></i>Visit Information
                                         </h5>
                                     </div>
@@ -385,6 +510,14 @@
     private string? fileActionError;
     private readonly HashSet<int> deletingFileIds = new();
     private const long MaxFileSizeBytes = 10 * 1024 * 1024; // 10 MB
+    private string? familyMedicEmail;
+    private string? familyMedicRequestStatus;
+    private bool isRequestingFamilyMedic;
+    private bool isRemovingFamilyMedic;
+    private string? familyMedicError;
+    private bool hasOutlookConnected;
+    private bool isDisconnectingOutlook;
+    private string? outlookError;
 
     protected override async Task OnInitializedAsync()
     {
@@ -418,6 +551,178 @@
         }
 
         await LoadDoctorOptionsAsync();
+        await LoadFamilyMedicInfoAsync();
+        await CheckOutlookConnectionAsync();
+        
+        // Check for OAuth callback parameters
+        var uri = Navigation.ToAbsoluteUri(Navigation.Uri);
+        var queryParams = Microsoft.AspNetCore.WebUtilities.QueryHelpers.ParseQuery(uri.Query);
+        
+        if (queryParams.ContainsKey("outlookConnected") && queryParams["outlookConnected"].ToString() == "true")
+        {
+            message = "Outlook account connected successfully!";
+            await CheckOutlookConnectionAsync();
+        }
+        else if (queryParams.ContainsKey("outlookError"))
+        {
+            var errorParam = queryParams["outlookError"].ToString();
+            outlookError = errorParam switch
+            {
+                "not_configured" => "Outlook integration is not configured. Please contact your administrator or configure Azure app registration.",
+                "auth_failed" => "Outlook authentication failed. Please try again.",
+                "no_token" => "No token received from Outlook. Please try again.",
+                "storage_failed" => "Failed to save Outlook connection. Please try again.",
+                "callback_error" => "An error occurred during Outlook connection. Please try again.",
+                _ => "An error occurred. Please try again."
+            };
+            
+            // Clear the error from URL to prevent it from showing on page refresh
+            Navigation.NavigateTo("/medical-info", replace: true);
+        }
+    }
+
+    private async Task LoadFamilyMedicInfoAsync()
+    {
+        if (patient == null)
+        {
+            return;
+        }
+
+        familyMedicEmail = patient.FamilyMedicEmail;
+        
+        var currentRequest = await FamilyMedicService.GetCurrentRequestForPatientAsync(patient.Id);
+        if (currentRequest != null)
+        {
+            familyMedicRequestStatus = currentRequest.Status;
+        }
+        else if (patient.FamilyMedicDoctorId.HasValue)
+        {
+            familyMedicRequestStatus = "Accepted";
+        }
+        else
+        {
+            familyMedicRequestStatus = null;
+        }
+    }
+
+    private async Task HandleRequestFamilyMedic()
+    {
+        if (patient == null || string.IsNullOrWhiteSpace(familyMedicEmail))
+        {
+            familyMedicError = "Please enter a valid email address";
+            return;
+        }
+
+        isRequestingFamilyMedic = true;
+        familyMedicError = null;
+
+        try
+        {
+            var request = await FamilyMedicService.RequestFamilyMedicAsync(patient.Id, familyMedicEmail);
+            familyMedicRequestStatus = request.Status;
+            message = "Family medic request sent successfully. The doctor will be notified.";
+            
+            // Reload patient to get updated info
+            patient = await PatientService.GetByIdAsync(patient.Id);
+            await LoadFamilyMedicInfoAsync();
+        }
+        catch (Exception ex)
+        {
+            familyMedicError = ex.Message;
+            _logger.LogError(ex, "Error requesting family medic");
+        }
+        finally
+        {
+            isRequestingFamilyMedic = false;
+        }
+    }
+
+    private async Task HandleRemoveFamilyMedic()
+    {
+        if (patient == null)
+        {
+            return;
+        }
+
+        isRemovingFamilyMedic = true;
+        familyMedicError = null;
+
+        try
+        {
+            var success = await FamilyMedicService.RemoveFamilyMedicAsync(patient.Id);
+            if (success)
+            {
+                message = "Family medic removed successfully.";
+                familyMedicEmail = null;
+                familyMedicRequestStatus = null;
+                
+                // Reload patient
+                patient = await PatientService.GetByIdAsync(patient.Id);
+                await LoadFamilyMedicInfoAsync();
+            }
+            else
+            {
+                familyMedicError = "Failed to remove family medic";
+            }
+        }
+        catch (Exception ex)
+        {
+            familyMedicError = ex.Message;
+            _logger.LogError(ex, "Error removing family medic");
+        }
+        finally
+        {
+            isRemovingFamilyMedic = false;
+        }
+    }
+
+    private async Task CheckOutlookConnectionAsync()
+    {
+        if (patient == null)
+        {
+            return;
+        }
+
+        var token = await FamilyMedicService.GetOutlookTokenAsync(patient.Id);
+        hasOutlookConnected = !string.IsNullOrEmpty(token);
+    }
+
+    private async Task HandleDisconnectOutlook()
+    {
+        if (patient == null)
+        {
+            return;
+        }
+
+        isDisconnectingOutlook = true;
+        outlookError = null;
+
+        try
+        {
+            var token = Antiforgery.GetToken();
+            var request = new HttpRequestMessage(HttpMethod.Post, "api/outlook/disconnect");
+            request.Headers.Add("X-CSRF-TOKEN", token);
+
+            var response = await HttpClient.SendAsync(request);
+            if (response.IsSuccessStatusCode)
+            {
+                hasOutlookConnected = false;
+                message = "Outlook account disconnected successfully.";
+            }
+            else
+            {
+                outlookError = "Failed to disconnect Outlook account. Please try again.";
+            }
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error disconnecting Outlook");
+            outlookError = "An error occurred while disconnecting Outlook.";
+        }
+        finally
+        {
+            isDisconnectingOutlook = false;
+        }
     }
 
     private async Task LoadDoctorOptionsAsync()

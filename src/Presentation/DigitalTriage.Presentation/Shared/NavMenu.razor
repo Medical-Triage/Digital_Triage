@@ -163,6 +163,17 @@
                             <span class="label">Statistics</span>
                         </button>
                     </li>
+                    <li>
+                        <button type="button"
+                                class="menu-link menu-card menu-card-admin @GetActiveClass("/family-patients")"
+                                @onclick="@(() => NavigateTo("/family-patients"))"
+                                aria-label="Family Patients">
+                            <span class="icon-wrapper">
+                                <i class="bi bi-people-fill"></i>
+                            </span>
+                            <span class="label">Family Patients</span>
+                        </button>
+                    </li>
                 }
             }
         </ul>

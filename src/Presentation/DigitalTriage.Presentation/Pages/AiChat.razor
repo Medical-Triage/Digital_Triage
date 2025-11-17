@@ -1,6 +1,17 @@
 @page "/ai-triage"
 @attribute [Authorize]
 @using Microsoft.AspNetCore.Authorization
+@using DigitalTriage.Presentation.Common.Helpers
+@using DigitalTriage.Application.Contracts.Services
+@using DigitalTriage.Domain.Entities
+@using System.Security.Claims
+@inject IPatientService PatientService
+@inject IFamilyMedicService FamilyMedicService
+@inject IEmailService EmailService
+@inject IPatientIssueService PatientIssueService
+@inject IAuthHelper Auth
+@inject IHttpContextAccessor Http
+@inject ILogger<AiChat> Logger
 
 <div class="container py-4">
     <div class="row mb-4">
@@ -99,6 +110,122 @@
                     <p class="small mb-0">AI triage is a preliminary assessment tool and should not replace professional medical advice. For emergencies, call your local emergency number.</p>
                 </div>
             </div>
+
+            @if (hasFamilyMedic && !isEmergency)
+            {
+                <div class="card shadow-sm border-0 border-success border-3 mt-3">
+                    <div class="card-body p-4">
+                        <h6 class="fw-bold mb-3">
+                            <i class="bi bi-envelope-paper me-2 text-success"></i>Send to Family Medic
+                        </h6>
+                        <p class="small mb-3">Your medical issue is not an emergency. You can send this information to your family medic for review.</p>
+                        <button class="btn btn-success btn-sm w-100" @onclick="HandleSendToFamilyMedic" disabled="@isSendingToFamilyMedic">
+                            @if (isSendingToFamilyMedic)
+                            {
+                                <span class="spinner-border spinner-border-sm me-2" role="status"></span>
+                            }
+                            else
+                            {
+                                <i class="bi bi-send me-2"></i>
+                            }
+                            Send to Family Medic
+                        </button>
+                        @if (!string.IsNullOrEmpty(sendToFamilyMedicError))
+                        {
+                            <div class="alert alert-danger py-2 mt-2 mb-0">
+                                <i class="bi bi-exclamation-circle me-1"></i>@sendToFamilyMedicError
+                            </div>
+                        }
+                        @if (!string.IsNullOrEmpty(sendToFamilyMedicSuccess))
+                        {
+                            <div class="alert alert-success py-2 mt-2 mb-0">
+                                <i class="bi bi-check-circle me-1"></i>@sendToFamilyMedicSuccess
+                            </div>
+                        }
+                    </div>
+                </div>
+            }
         </div>
     </div>
 </div>
+
+@code {
+    private Patient? patient;
+    private bool hasFamilyMedic;
+    private bool isEmergency = false; // In real implementation, this would be determined by AI
+    private bool isSendingToFamilyMedic;
+    private string? sendToFamilyMedicError;
+    private string? sendToFamilyMedicSuccess;
+
+    protected override async Task OnInitializedAsync()
+    {
+        var user = Http.HttpContext?.User ?? new ClaimsPrincipal(new ClaimsIdentity());
+        var userId = Auth.GetUserId(user);
+
+        if (userId.HasValue)
+        {
+            patient = await PatientService.GetByIdAsync(userId.Value);
+            hasFamilyMedic = patient?.FamilyMedicDoctorId.HasValue == true;
+        }
+    }
+
+    private async Task HandleSendToFamilyMedic()
+    {
+        if (patient == null || string.IsNullOrEmpty(patient.FamilyMedicEmail))
+        {
+            sendToFamilyMedicError = "No family medic assigned.";
+            return;
+        }
+
+        isSendingToFamilyMedic = true;
+        sendToFamilyMedicError = null;
+        sendToFamilyMedicSuccess = null;
+
+        try
+        {
+            // Create a patient issue from the AI conversation
+            // In a real implementation, this would come from the actual AI conversation
+            var issue = await PatientIssueService.CreateAsync(
+                patient.Id,
+                "Medical Consultation Request",
+                "Patient requested consultation after AI triage assessment.");
+
+            // Get Outlook token (in real implementation, this would be obtained via OAuth2)
+            var outlookToken = await FamilyMedicService.GetOutlookTokenAsync(patient.Id);
+            
+            if (string.IsNullOrEmpty(outlookToken))
+            {
+                sendToFamilyMedicError = "Please connect your Outlook account first. Go to Medical Information page to set up Outlook integration.";
+                return;
+            }
+
+            // Send email via Outlook
+            var success = await EmailService.SendProblemToFamilyMedicAsync(
+                patient.Email,
+                patient.FamilyMedicEmail,
+                outlookToken,
+                issue.Title ?? "Medical Consultation Request",
+                issue.Description ?? "Patient requested consultation after AI triage assessment.",
+                issue.ProblemType,
+                issue.EmergencyGrade.HasValue ? (int)issue.EmergencyGrade.Value : null);
+
+            if (success)
+            {
+                sendToFamilyMedicSuccess = "Medical issue sent to your family medic successfully.";
+            }
+            else
+            {
+                sendToFamilyMedicError = "Failed to send email. Please try again or contact your family medic directly.";
+            }
+        }
+        catch (Exception ex)
+        {
+            Logger.LogError(ex, "Error sending to family medic");
+            sendToFamilyMedicError = "An error occurred while sending to your family medic. Please try again.";
+        }
+        finally
+        {
+            isSendingToFamilyMedic = false;
+        }
+    }
+}

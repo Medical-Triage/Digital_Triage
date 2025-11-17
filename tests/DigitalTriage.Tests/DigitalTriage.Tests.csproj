@@ -24,6 +24,7 @@
     <ProjectReference Include="..\..\src\Infrastructure\DigitalTriage.Infrastructure\DigitalTriage.Infrastructure.csproj" />
     <ProjectReference Include="..\..\src\Application\DigitalTriage.Application\DigitalTriage.Application.csproj" />
     <ProjectReference Include="..\..\src\Domain\DigitalTriage.Domain\DigitalTriage.Domain.csproj" />
+    <ProjectReference Include="..\..\src\Presentation\DigitalTriage.Presentation\DigitalTriage.Presentation.csproj" />
   </ItemGroup>
 
   <ItemGroup>
