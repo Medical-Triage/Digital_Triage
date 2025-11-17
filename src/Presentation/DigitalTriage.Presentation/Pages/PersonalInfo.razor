@@ -2,12 +2,16 @@
 @attribute [Authorize]
 @using System.Security.Claims
 @using DigitalTriage.Domain.Entities
+@using DigitalTriage.Application.Contracts.Services
 @using Microsoft.JSInterop
 @inject IPatientService PatientService
 @inject IAuthHelper Auth
 @inject IHttpContextAccessor Http
 @inject NavigationManager Navigation
 @inject IHospitalService HospitalService
+@inject IFamilyMedicService FamilyMedicService
+@inject IEmailService EmailService
+@inject ILogger<PersonalInfo> Logger
 
 <div class="container py-4">
     <div class="row mb-4">
@@ -208,7 +212,51 @@
                                                     <i class="bi bi-clock me-1"></i>@i.CreatedAt.LocalDateTime.ToString("MMM dd, yyyy HH:mm")
                                                 </small>
                                             </div>
-                                            <div class="text-secondary">@i.Description</div>
+                                            <div class="text-secondary mb-2">@i.Description</div>
+                                            <div class="d-flex justify-content-end gap-2 mt-2">
+                                                @if (patient?.FamilyMedicDoctorId.HasValue == true && !string.IsNullOrEmpty(patient.FamilyMedicEmail))
+                                                {
+                                                    <button class="btn btn-success btn-sm" 
+                                                            @onclick="async () => await SendIssueToFamilyMedic(i)" 
+                                                            disabled="@(IsSendingIssue(i.Id))">
+                                                        @if (IsSendingIssue(i.Id))
+                                                        {
+                                                            <span class="spinner-border spinner-border-sm me-1" role="status"></span>
+                                                        }
+                                                        else
+                                                        {
+                                                            <i class="bi bi-envelope-paper me-1"></i>
+                                                        }
+                                                        Send to Family Medic
+                                                    </button>
+                                                }
+                                                <button class="btn btn-outline-danger btn-sm" 
+                                                        @onclick="async () => await DeleteIssue(i)" 
+                                                        disabled="@(IsDeletingIssue(i.Id))">
+                                                    @if (IsDeletingIssue(i.Id))
+                                                    {
+                                                        <span class="spinner-border spinner-border-sm me-1" role="status"></span>
+                                                    }
+                                                    else
+                                                    {
+                                                        <i class="bi bi-trash me-1"></i>
+                                                    }
+                                                    Delete
+                                                </button>
+                                            </div>
+                                                @if (GetIssueError(i.Id) != null)
+                                                {
+                                                    <div class="alert alert-danger py-2 mt-2 mb-0">
+                                                        <i class="bi bi-exclamation-circle me-1"></i>@GetIssueError(i.Id)
+                                                    </div>
+                                                }
+                                                @if (GetIssueSuccess(i.Id) != null)
+                                                {
+                                                    <div class="alert alert-success py-2 mt-2 mb-0">
+                                                        <i class="bi bi-check-circle me-1"></i>@GetIssueSuccess(i.Id)
+                                                    </div>
+                                                }
+                                            }
                                         </div>
                                     </div>
                                 }
@@ -235,7 +283,7 @@
                             <li class="mb-3">
                                 <i class="bi bi-envelope me-2"></i>
                                 <strong>Email:</strong><br />
-                                <span class="opacity-75">@patient.Email</span>
+                                <span class="opacity-75">@patient!.Email</span>
                             </li>
                             <li>
                                 <i class="bi bi-calendar-event me-2"></i>
@@ -541,6 +589,10 @@ private IReadOnlyList<PatientIssue>? issues;
  private bool isPreviewLoading;
  private string? previewError;
  private List<HospitalDoctorInfo> previewDoctors = new();
+ private readonly HashSet<int> sendingIssueIds = new();
+ private readonly HashSet<int> deletingIssueIds = new();
+ private readonly Dictionary<int, string> issueErrors = new();
+ private readonly Dictionary<int, string> issueSuccess = new();
 
  [Inject] public IPatientIssueService IssueService { get; set; } = default!;
 
@@ -905,5 +957,107 @@ private class HospitalDoctorInfo
  {
   Manual,
   Nearest
+ }
+
+ private async Task SendIssueToFamilyMedic(PatientIssue issue)
+ {
+  if (patient == null || string.IsNullOrEmpty(patient.FamilyMedicEmail))
+  {
+   issueErrors[issue.Id] = "No family medic assigned.";
+   return;
+  }
+
+  sendingIssueIds.Add(issue.Id);
+  issueErrors.Remove(issue.Id);
+  issueSuccess.Remove(issue.Id);
+
+  try
+  {
+   // Get Outlook token
+   var outlookToken = await FamilyMedicService.GetOutlookTokenAsync(patient.Id);
+   
+   if (string.IsNullOrEmpty(outlookToken))
+   {
+    issueErrors[issue.Id] = "Please connect your Outlook account first. Go to Medical Information page to set up Outlook integration.";
+    return;
+   }
+
+   // Send email via Outlook
+   var success = await EmailService.SendProblemToFamilyMedicAsync(
+    patient.Email,
+    patient.FamilyMedicEmail,
+    outlookToken,
+    issue.Title ?? "Medical Issue",
+    issue.Description ?? "No description provided",
+    issue.ProblemType,
+    issue.EmergencyGrade.HasValue ? (int)issue.EmergencyGrade.Value : null);
+
+   if (success)
+   {
+    issueSuccess[issue.Id] = "Issue sent to your family medic successfully.";
+    issueErrors.Remove(issue.Id);
+   }
+   else
+   {
+    issueErrors[issue.Id] = "Failed to send email. Please try again or contact your family medic directly.";
+    issueSuccess.Remove(issue.Id);
+   }
+  }
+  catch (Exception ex)
+  {
+   Logger.LogError(ex, "Error sending issue {IssueId} to family medic", issue.Id);
+   issueErrors[issue.Id] = "An error occurred while sending to your family medic. Please try again.";
+   issueSuccess.Remove(issue.Id);
+  }
+  finally
+  {
+   sendingIssueIds.Remove(issue.Id);
+  }
+ }
+
+ private bool IsSendingIssue(int issueId) => sendingIssueIds.Contains(issueId);
+ private bool IsDeletingIssue(int issueId) => deletingIssueIds.Contains(issueId);
+ private string? GetIssueError(int issueId) => issueErrors.TryGetValue(issueId, out var error) ? error : null;
+ private string? GetIssueSuccess(int issueId) => issueSuccess.TryGetValue(issueId, out var success) ? success : null;
+
+ private async Task DeleteIssue(PatientIssue issue)
+ {
+  if (patient == null)
+  {
+   issueErrors[issue.Id] = "Unable to delete issue. Please refresh the page.";
+   return;
+  }
+
+  deletingIssueIds.Add(issue.Id);
+  issueErrors.Remove(issue.Id);
+  issueSuccess.Remove(issue.Id);
+
+  try
+  {
+   var success = await IssueService.DeleteAsync(issue.Id, patient.Id);
+   if (success)
+   {
+    // Reload issues list
+    var id = Auth.GetUserId(CurrentUser);
+    if (id.HasValue)
+    {
+     issues = await IssueService.GetByPatientIdAsync(id.Value);
+    }
+    issueSuccess[issue.Id] = "Issue deleted successfully.";
+   }
+   else
+   {
+    issueErrors[issue.Id] = "Failed to delete issue. It may have already been deleted.";
+   }
+  }
+  catch (Exception ex)
+  {
+   Logger.LogError(ex, "Error deleting issue {IssueId}", issue.Id);
+   issueErrors[issue.Id] = "An error occurred while deleting the issue. Please try again.";
+  }
+  finally
+  {
+   deletingIssueIds.Remove(issue.Id);
+  }
  }
 }

@@ -17,6 +17,7 @@ public class MedicalTriageDbContext(DbContextOptions<MedicalTriageDbContext> opt
     public DbSet<DoctorProfile> DoctorProfiles => Set<DoctorProfile>();
     public DbSet<DoctorHospitalMembership> DoctorHospitalMemberships => Set<DoctorHospitalMembership>();
     public DbSet<MedicalFile> MedicalFiles => Set<MedicalFile>();
+    public DbSet<FamilyMedicRequest> FamilyMedicRequests => Set<FamilyMedicRequest>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
@@ -103,5 +104,31 @@ public class MedicalTriageDbContext(DbContextOptions<MedicalTriageDbContext> opt
         modelBuilder.Entity<DoctorHospitalMembership>()
             .HasIndex(m => new { m.DoctorId, m.HospitalId, m.IsActive })
             .HasDatabaseName("IX_DoctorHospitalMembership_Doctor_Hospital_IsActive");
+
+        modelBuilder.Entity<Patient>()
+            .HasOne(p => p.FamilyMedicDoctor)
+            .WithMany(d => d.FamilyPatients)
+            .HasForeignKey(p => p.FamilyMedicDoctorId)
+            .OnDelete(DeleteBehavior.Restrict); // NO ACTION to avoid multiple cascade paths
+
+        modelBuilder.Entity<FamilyMedicRequest>()
+            .HasOne(fmr => fmr.Patient)
+            .WithMany(p => p.FamilyMedicRequests)
+            .HasForeignKey(fmr => fmr.PatientId)
+            .OnDelete(DeleteBehavior.Cascade);
+
+        modelBuilder.Entity<FamilyMedicRequest>()
+            .HasOne(fmr => fmr.Doctor)
+            .WithMany(d => d.FamilyMedicRequests)
+            .HasForeignKey(fmr => fmr.DoctorId)
+            .OnDelete(DeleteBehavior.Restrict); // NO ACTION to avoid multiple cascade paths
+
+        modelBuilder.Entity<FamilyMedicRequest>()
+            .Property(fmr => fmr.Status)
+            .HasDefaultValue("Pending");
+
+        modelBuilder.Entity<FamilyMedicRequest>()
+            .Property(fmr => fmr.RequestedAt)
+            .HasDefaultValueSql("SYSUTCDATETIME()");
     }
 }

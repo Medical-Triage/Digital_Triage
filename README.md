@@ -28,11 +28,13 @@ A modern medical triage platform built with ASP.NET Core Blazor Server that enab
 - **File Attachments**: Upload lab results or imaging to medical records with secure downloads and removal, stored under `wwwroot/uploads`
 - **AI Triage Assistant**: Get preliminary medical triage recommendations based on symptoms (Preview mode - UI only)
 - **Patient Issues Tracking**: Submit and track medical issues/concerns
+- **Family Medic Assignment**: Assign a family doctor by email address and send medical problems to them via Outlook
 
 ### For Doctors/Administrators
 - **Dedicated Doctor Registration**: Create doctor accounts with specialization details via `/register/doctor`
 - **Hospital Management Workspace**: A dedicated `/hospital-management` page to create or update hospitals, search facilities, and manually join/leave memberships (creators are not joined automatically)
 - **Admin Dashboard**: Access to comprehensive patient data, medical histories, attachments, and triage insights filtered by the hospitals the doctor currently belongs to
+- **Family Patients Management**: Dedicated page (`/family-patients`) to view all family patients, accept/reject requests, and view patient medical information
 - **Statistics Dashboard**: Advanced analytics page (`/statistics`) providing aggregated statistics on patients with active medical issues, including:
   - Filterable by location (country, county, city) and hospital
   - Time range filtering (last 7 days, 30 days, or custom range)
@@ -153,6 +155,7 @@ USE MedicalTriageDB;
 GO
 
 /* Drop existing tables if you are rebuilding */
+IF OBJECT_ID('dbo.FamilyMedicRequests','U') IS NOT NULL DROP TABLE dbo.FamilyMedicRequests;
 IF OBJECT_ID('dbo.MedicalFiles','U') IS NOT NULL DROP TABLE dbo.MedicalFiles;
 IF OBJECT_ID('dbo.DoctorHospitalMemberships','U') IS NOT NULL DROP TABLE dbo.DoctorHospitalMemberships;
 IF OBJECT_ID('dbo.MedicalDatas','U') IS NOT NULL DROP TABLE dbo.MedicalDatas;
@@ -197,7 +200,9 @@ CREATE TABLE dbo.Patients
     PlaceOfBirthId       INT NULL,
     DomicileId           INT NULL,
     Role                 NVARCHAR(20) NULL,
-    PreferredHospitalId  INT NULL
+    PreferredHospitalId  INT NULL,
+    FamilyMedicEmail     NVARCHAR(200) NULL,
+    FamilyMedicDoctorId  INT NULL
 );
 
 CREATE TABLE dbo.DoctorProfiles
@@ -277,10 +282,24 @@ CREATE TABLE dbo.PatientIssues
     LastUpdateDate  DATETIMEOFFSET NOT NULL DEFAULT SYSDATETIMEOFFSET()
 );
 
+CREATE TABLE dbo.FamilyMedicRequests
+(
+    Id              INT IDENTITY(1,1) PRIMARY KEY,
+    PatientId       INT NOT NULL,
+    DoctorEmail     NVARCHAR(200) NOT NULL,
+    Status          NVARCHAR(20) NOT NULL DEFAULT 'Pending', -- Pending, Accepted, Rejected
+    RequestedAt     DATETIME2 NOT NULL DEFAULT SYSUTCDATETIME(),
+    RespondedAt     DATETIME2 NULL,
+    DoctorId        INT NULL, -- Set when doctor accepts the request
+    OutlookToken    NVARCHAR(MAX) NULL, -- Encrypted refresh token for patient's Outlook account
+    TokenExpiresAt  DATETIME2 NULL
+);
+
 /* Foreign keys */
 ALTER TABLE dbo.Patients  ADD CONSTRAINT FK_Patients_PlacesOfBirth FOREIGN KEY (PlaceOfBirthId) REFERENCES dbo.PlacesOfBirth(Id) ON DELETE NO ACTION;
 ALTER TABLE dbo.Patients  ADD CONSTRAINT FK_Patients_Domiciles     FOREIGN KEY (DomicileId) REFERENCES dbo.Domiciles(Id) ON DELETE NO ACTION;
 ALTER TABLE dbo.Patients  ADD CONSTRAINT FK_Patients_Hospitals     FOREIGN KEY (PreferredHospitalId) REFERENCES dbo.Hospitals(Id) ON DELETE SET NULL;
+ALTER TABLE dbo.Patients  ADD CONSTRAINT FK_Patients_FamilyMedicDoctor FOREIGN KEY (FamilyMedicDoctorId) REFERENCES dbo.DoctorProfiles(Id) ON DELETE NO ACTION;
 
 ALTER TABLE dbo.DoctorProfiles ADD CONSTRAINT FK_DoctorProfiles_Patients FOREIGN KEY (UserId) REFERENCES dbo.Patients(Id) ON DELETE CASCADE;
 ALTER TABLE dbo.Hospitals ADD CONSTRAINT FK_Hospitals_DoctorProfiles FOREIGN KEY (CreatedByDoctorId) REFERENCES dbo.DoctorProfiles(Id) ON DELETE SET NULL;
@@ -290,11 +309,14 @@ ALTER TABLE dbo.MedicalDatas ADD CONSTRAINT FK_MedicalDatas_Patients          FO
 ALTER TABLE dbo.MedicalDatas ADD CONSTRAINT FK_MedicalDatas_DoctorProfiles    FOREIGN KEY (AuthorizedDoctorId) REFERENCES dbo.DoctorProfiles(Id) ON DELETE SET NULL;
 ALTER TABLE dbo.MedicalFiles ADD CONSTRAINT FK_MedicalFiles_MedicalDatas FOREIGN KEY (MedicalDataId) REFERENCES dbo.MedicalDatas(Id) ON DELETE CASCADE;
 ALTER TABLE dbo.PatientIssues ADD CONSTRAINT FK_PatientIssues_Patients FOREIGN KEY (PatientId) REFERENCES dbo.Patients(Id) ON DELETE CASCADE;
+ALTER TABLE dbo.FamilyMedicRequests ADD CONSTRAINT FK_FamilyMedicRequests_Patients FOREIGN KEY (PatientId) REFERENCES dbo.Patients(Id) ON DELETE CASCADE;
+ALTER TABLE dbo.FamilyMedicRequests ADD CONSTRAINT FK_FamilyMedicRequests_DoctorProfiles FOREIGN KEY (DoctorId) REFERENCES dbo.DoctorProfiles(Id) ON DELETE NO ACTION;
 
 /* Indexes */
 CREATE INDEX IX_Patients_DomicileId        ON dbo.Patients(DomicileId);
 CREATE INDEX IX_Patients_PlaceOfBirthId    ON dbo.Patients(PlaceOfBirthId);
 CREATE INDEX IX_Patients_PreferredHospital ON dbo.Patients(PreferredHospitalId);
+CREATE INDEX IX_Patients_FamilyMedicDoctor ON dbo.Patients(FamilyMedicDoctorId);
 CREATE INDEX IX_DoctorProfiles_UserId      ON dbo.DoctorProfiles(UserId);
 CREATE INDEX IX_Hospitals_CreatedByDoctor  ON dbo.Hospitals(CreatedByDoctorId);
 CREATE UNIQUE INDEX IX_DoctorHospitalMemberships_Doctor_Hospital_IsActive ON dbo.DoctorHospitalMemberships(DoctorId, HospitalId, IsActive);
@@ -302,6 +324,9 @@ CREATE INDEX IX_MedicalDatas_PatientId        ON dbo.MedicalDatas(PatientId);
 CREATE INDEX IX_MedicalDatas_AuthorizedDoctor ON dbo.MedicalDatas(AuthorizedDoctorId);
 CREATE INDEX IX_MedicalFiles_MedicalDataId    ON dbo.MedicalFiles(MedicalDataId);
 CREATE INDEX IX_PatientIssues_PatientId       ON dbo.PatientIssues(PatientId);
+CREATE INDEX IX_FamilyMedicRequests_PatientId ON dbo.FamilyMedicRequests(PatientId);
+CREATE INDEX IX_FamilyMedicRequests_DoctorEmail ON dbo.FamilyMedicRequests(DoctorEmail);
+CREATE INDEX IX_FamilyMedicRequests_Status ON dbo.FamilyMedicRequests(Status);
 GO
 
 /* Optionally mark migrations as applied */
@@ -329,8 +354,14 @@ GO
   - `EmergencyGrade` (INT): ESI level for severity classification
   - `IsActive` (BIT): Status flag (active/resolved) - required for statistics visibility
   - `LastUpdateDate` (DATETIMEOFFSET): Timestamp for time-based filtering
+- **Family Medic feature tables and columns:**
+  - `FamilyMedicEmail` (NVARCHAR(200)): Email address of the assigned family medic (in `Patients` table)
+  - `FamilyMedicDoctorId` (INT): Foreign key to `DoctorProfiles` table (in `Patients` table)
+  - `FamilyMedicRequests` table: Tracks family medic assignment requests with status (Pending/Accepted/Rejected)
+  - `OutlookToken` (NVARCHAR(MAX)): Encrypted refresh token for patient's Outlook account (in `FamilyMedicRequests` table)
+  - `TokenExpiresAt` (DATETIME2): Expiration date for Outlook token
 - Role-based patient schema used by the current application
-- All necessary indexes
+- All necessary indexes and foreign key constraints
 
 **PatientIssues Statistics Fields:**
 - All new issues created through the application are automatically set to `IsActive = 1` and `LastUpdateDate = current time`
@@ -398,6 +429,23 @@ GO
 
 After running the script, EF Core believes all migrations are applied thanks to the final MERGE statement. You can disable that part if you prefer to manage migration history manually.
 
+### Step 3.5: Apply Family Medic Database Changes (If Using Manual Setup)
+
+If you're using manual SQL scripts instead of EF migrations, you also need to run the family medic database changes script:
+
+```bash
+# Run the family medic database changes script
+sqlcmd -S <YOUR_SERVER_NAME>\<INSTANCE_NAME> -d MedicalTriageDB -i family_medic_database_changes.sql
+```
+
+Or execute `family_medic_database_changes.sql` manually in SSMS. This script:
+- Adds `FamilyMedicEmail` and `FamilyMedicDoctorId` columns to the `Patients` table
+- Creates the `FamilyMedicRequests` table for tracking family medic assignment requests
+- Adds necessary foreign keys and indexes
+- Handles existing databases safely (checks for existing columns/tables before creating)
+
+**Note:** If you're using EF migrations, the family medic schema will be included automatically when you run `dotnet ef database update`.
+
 ### Step 4: Verify Database Setup
 
 After creating the schema (using either method), verify the database was created successfully:
@@ -411,11 +459,12 @@ You should see all the tables listed:
 - `Domiciles`
 - `DoctorHospitalMemberships`
 - `DoctorProfiles`
+- `FamilyMedicRequests` (new - for family medic feature)
 - `Hospitals`
 - `MedicalDatas`
 - `MedicalFiles`
 - `PatientIssues`
-- `Patients`
+- `Patients` (includes `FamilyMedicEmail` and `FamilyMedicDoctorId` columns)
 - `PlacesOfBirth`
 
 You can also verify the foreign key relationships:
@@ -487,8 +536,10 @@ ORDER BY ParentTable, ForeignKeyName;
   - `PatientService`: Patient CRUD operations and authentication
   - `HospitalService`: Hospital creation, membership management, and patient hospital assignment
   - `MedicalDataService`: Medical data management
-  - `PatientIssueService`: Issue tracking
+  - `PatientIssueService`: Issue tracking and deletion
   - `StatisticsService`: Statistics and analytics for patient issues with filtering capabilities
+  - `FamilyMedicService`: Family medic assignment, request management, and Outlook token storage
+  - `EmailService`: Email sending via Microsoft Graph API (Outlook integration)
 - **Data Layer**: Entity Framework Core with `MedicalTriageDbContext`
 - **Helpers**: Utility classes for authentication and antiforgery protection
 - **API Controllers**: RESTful endpoints for statistics (`/api/stats/*`) accessible to doctors only
@@ -548,7 +599,16 @@ ORDER BY ParentTable, ForeignKeyName;
 8. **User Interface Enhancements**:
    - **Fixed Sidebar Navigation**: Navigation menu remains visible while scrolling page content
    - **Role-Based Menu**: Profile section (Personal Information, Medical Information, AI Triage) only visible to patients
-   - Doctors see a streamlined menu with Home, Admin Dashboard, Hospital Management, Statistics, and Exit options
+   - Doctors see a streamlined menu with Home, Admin Dashboard, Hospital Management, Statistics, Family Patients, and Exit options
+
+9. **Family Medic Feature**:
+   - **Patient Assignment**: Patients can assign a family medic by entering the doctor's email address in the Medical Information page
+   - **Request System**: When a patient requests a doctor as their family medic, the doctor receives an in-app notification
+   - **Accept/Reject**: Doctors can accept or reject family medic requests from the Family Patients page
+   - **Family Patients Dashboard**: Doctors have a dedicated page (`/family-patients`) to view all their family patients, see their medical information, and manage pending requests
+   - **Email Integration**: After AI triage (if not an emergency), patients can send their medical problem to their family medic via Outlook email
+   - **Outlook OAuth2**: Patients can connect their Outlook account to enable email sending (see `OUTLOOK_OAUTH_SETUP.md` for setup instructions)
+   - **Change Family Medic**: Patients can change their family medic at any time, which requires the new doctor to accept the request
 
 ## Project Structure
 
@@ -576,6 +636,14 @@ Key configuration in `appsettings.Development.json`:
 - **ConnectionStrings**: Database connection string
 - **Logging**: Log level configuration
 - **BaseUrl**: API base URL (defaults to `https://localhost:7266`)
+- **MicrosoftGraph**: Microsoft Graph API configuration for Outlook integration (optional):
+  - `ClientId`: Azure AD application client ID
+  - `ClientSecret`: Azure AD application client secret
+  - `TenantId`: Azure AD tenant ID (use "common" for multi-tenant)
+- **Encryption**: Encryption key for storing sensitive data (e.g., Outlook tokens):
+  - `Key`: 32-byte encryption key (must be exactly 32 characters)
+
+**Note:** Outlook integration is optional. If `MicrosoftGraph:ClientId` and `MicrosoftGraph:ClientSecret` are not configured, the application will run normally but Outlook features will be disabled. See `OUTLOOK_SETUP_INSTRUCTIONS.md` for detailed setup instructions.
 
 ### Cookie Authentication Settings
 

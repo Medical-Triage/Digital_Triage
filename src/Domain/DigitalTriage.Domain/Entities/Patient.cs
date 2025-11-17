@@ -50,6 +50,19 @@ public class Patient
 
     public DoctorProfile? DoctorProfile { get; set; }
 
+    /// <summary>
+    /// Email address of the assigned family medic.
+    /// </summary>
+    [EmailAddress, MaxLength(200)]
+    public string? FamilyMedicEmail { get; set; }
+
+    /// <summary>
+    /// The doctor profile ID of the assigned family medic.
+    /// </summary>
+    public int? FamilyMedicDoctorId { get; set; }
+    public DoctorProfile? FamilyMedicDoctor { get; set; }
+
     public ICollection<MedicalData> MedicalDatas { get; set; } = new List<MedicalData>();
     public ICollection<PatientIssue> Issues { get; set; } = new List<PatientIssue>();
+    public ICollection<FamilyMedicRequest> FamilyMedicRequests { get; set; } = new List<FamilyMedicRequest>();
 }
